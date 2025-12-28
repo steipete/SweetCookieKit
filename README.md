@@ -17,7 +17,7 @@ for selecting browsers and profiles, filtering by domain, and converting results
 ### Swift Package Manager
 
 ```swift
-.package(path: "../SweetCookieKit")
+.package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.1.0")
 ```
 
 ## Usage
@@ -62,7 +62,7 @@ let query = BrowserCookieQuery(
 ### Pick a browser order
 
 ```swift
-let order = Browser.defaultImportOrder
+let order = Browser.defaultImportOrder // preferred order (Safari → Chrome → Firefox)
 for browser in order {
     let results = try client.records(matching: query, in: browser)
     // results are grouped per profile/store

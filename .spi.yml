@@ -1,0 +1,12 @@
+# This is a manifest file for the Swift Package Index to auto-generate and host
+# DocC documentation.
+#
+# For reference see:
+# https://swiftpackageindex.com/SwiftPackageIndex/SPIManifest/~/documentation/spimanifest/commonusecases
+version: 1
+
+builder:
+  configs:
+    - documentation_targets:
+        # First item in the list is the "landing" (default) target
+        - SweetCookieKit
