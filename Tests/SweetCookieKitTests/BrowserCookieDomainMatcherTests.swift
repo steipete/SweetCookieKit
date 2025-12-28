@@ -14,20 +14,35 @@ struct BrowserCookieDomainMatcherTests {
 
     @Test
     func matches_contains() {
-        #expect(BrowserCookieDomainMatcher.matches(domain: "sub.example.com", patterns: ["example.com"], match: .contains))
-        #expect(!BrowserCookieDomainMatcher.matches(domain: "sub.example.com", patterns: ["nope.com"], match: .contains))
+        #expect(BrowserCookieDomainMatcher.matches(
+            domain: "sub.example.com",
+            patterns: ["example.com"],
+            match: .contains))
+        #expect(!BrowserCookieDomainMatcher.matches(
+            domain: "sub.example.com",
+            patterns: ["nope.com"],
+            match: .contains))
     }
 
     @Test
     func matches_suffix() {
-        #expect(BrowserCookieDomainMatcher.matches(domain: "sub.example.com", patterns: ["example.com"], match: .suffix))
-        #expect(!BrowserCookieDomainMatcher.matches(domain: "sub.example.com", patterns: ["example.net"], match: .suffix))
+        #expect(BrowserCookieDomainMatcher.matches(
+            domain: "sub.example.com",
+            patterns: ["example.com"],
+            match: .suffix))
+        #expect(!BrowserCookieDomainMatcher.matches(
+            domain: "sub.example.com",
+            patterns: ["example.net"],
+            match: .suffix))
     }
 
     @Test
     func matches_exact_normalizesLeadingDot() {
         #expect(BrowserCookieDomainMatcher.matches(domain: ".example.com", patterns: ["example.com"], match: .exact))
-        #expect(!BrowserCookieDomainMatcher.matches(domain: "sub.example.com", patterns: ["example.com"], match: .exact))
+        #expect(!BrowserCookieDomainMatcher.matches(
+            domain: "sub.example.com",
+            patterns: ["example.com"],
+            match: .exact))
     }
 
     @Test
@@ -50,13 +65,21 @@ struct BrowserCookieDomainMatcherTests {
             isSecure: false,
             isHTTPOnly: false)
 
-        #expect(BrowserCookieDomainMatcher.filterExpired([fresh, expired], includeExpired: false, now: now).map(\.name) == ["a"])
-        #expect(BrowserCookieDomainMatcher.filterExpired([fresh, expired], includeExpired: true, now: now).map(\.name) == ["a", "b"])
+        #expect(BrowserCookieDomainMatcher.filterExpired([fresh, expired], includeExpired: false, now: now)
+            .map(\.name) == ["a"])
+        #expect(BrowserCookieDomainMatcher.filterExpired([fresh, expired], includeExpired: true, now: now)
+            .map(\.name) == [
+                "a",
+                "b",
+            ])
     }
 
     @Test
     func sqlCondition_escapesQuotes() {
-        let sql = BrowserCookieDomainMatcher.sqlCondition(column: "host_key", patterns: ["exa'mple.com"], match: .contains)
+        let sql = BrowserCookieDomainMatcher.sqlCondition(
+            column: "host_key",
+            patterns: ["exa'mple.com"],
+            match: .contains)
         #expect(sql.contains("exa''mple.com"))
     }
 
@@ -81,13 +104,11 @@ struct BrowserCookieDomainMatcherTests {
         #expect(safari.browser == .safari)
 
         let chrome = BrowserCookieError.mapChromeError(.keychainDenied, browser: .chrome)
-        let chromeIsAccessDenied: Bool
-        if case .accessDenied = chrome { chromeIsAccessDenied = true } else { chromeIsAccessDenied = false }
+        let chromeIsAccessDenied = if case .accessDenied = chrome { true } else { false }
         #expect(chromeIsAccessDenied)
 
         let firefox = BrowserCookieError.mapFirefoxError(.cookieDBNotFound(path: "x"), browser: .firefox)
-        let firefoxIsNotFound: Bool
-        if case .notFound = firefox { firefoxIsNotFound = true } else { firefoxIsNotFound = false }
+        let firefoxIsNotFound = if case .notFound = firefox { true } else { false }
         #expect(firefoxIsNotFound)
     }
 }
