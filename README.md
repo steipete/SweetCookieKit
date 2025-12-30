@@ -80,6 +80,17 @@ swift run SweetCookieCLI --help
 
 - Safari cookie access may require Full Disk Access.
 - Chromium imports can trigger a Keychain prompt for "Chrome Safe Storage".
+- To explain keychain prompts before they appear, set a preflight handler:
+
+```swift
+import SweetCookieKit
+
+BrowserCookieKeychainPromptHandler.shared.handler = { context in
+    // Show a blocking alert or custom UI before the system prompt appears.
+    // context.kind = .chromiumSafeStorage
+}
+```
+
 - This package does not persist cookies. It only reads and returns them.
 
 ## Development
