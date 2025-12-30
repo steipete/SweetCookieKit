@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.2 — Unreleased
+## 0.1.2 — 2025-12-30
 - Keychain: add a preflight hook to explain Chromium Safe Storage prompts before the macOS dialog.
 
 ## 0.1.1
