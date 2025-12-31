@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 — Unreleased
+- Local storage: add a Chromium LevelDB reader with Snappy support for localStorage entries.
+- Tests: use Swift Testing for local storage reader coverage.
+
 ## 0.1.2 — 2025-12-30
 - Keychain: add a preflight hook to explain Chromium Safe Storage prompts before the macOS dialog.
 
