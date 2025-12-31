@@ -1,9 +1,10 @@
 import Foundation
-import XCTest
+import Testing
 @testable import SweetCookieKit
 
-final class ChromiumLocalStorageReaderTests: XCTestCase {
-    func testReadsHostOnlyStorageKeyWithoutPrefix() throws {
+struct ChromiumLocalStorageReaderTests {
+    @Test
+    func readsHostOnlyStorageKeyWithoutPrefix() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(
             storageKey: "minimax.io",
@@ -16,12 +17,13 @@ final class ChromiumLocalStorageReaderTests: XCTestCase {
             for: "https://minimax.io",
             in: levelDBURL)
 
-        XCTAssertEqual(entries.count, 1)
-        XCTAssertEqual(entries.first?.key, "access_token")
-        XCTAssertEqual(entries.first?.value, "token-abc")
+        #expect(entries.count == 1)
+        #expect(entries.first?.key == "access_token")
+        #expect(entries.first?.value == "token-abc")
     }
 
-    func testReadsPrefixedStorageKey() throws {
+    @Test
+    func readsPrefixedStorageKey() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(storageKey: "https://example.com", key: "pref")
         let value = self.localStorageValue("value-0")
@@ -31,12 +33,13 @@ final class ChromiumLocalStorageReaderTests: XCTestCase {
             for: "https://example.com",
             in: levelDBURL)
 
-        XCTAssertEqual(entries.count, 1)
-        XCTAssertEqual(entries.first?.key, "pref")
-        XCTAssertEqual(entries.first?.value, "value-0")
+        #expect(entries.count == 1)
+        #expect(entries.first?.key == "pref")
+        #expect(entries.first?.value == "value-0")
     }
 
-    func testReadsPartitionedStorageKey() throws {
+    @Test
+    func readsPartitionedStorageKey() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(
             storageKey: "https://example.com/^0https://top.example",
@@ -48,9 +51,9 @@ final class ChromiumLocalStorageReaderTests: XCTestCase {
             for: "https://example.com",
             in: levelDBURL)
 
-        XCTAssertEqual(entries.count, 1)
-        XCTAssertEqual(entries.first?.key, "pref")
-        XCTAssertEqual(entries.first?.value, "value-1")
+        #expect(entries.count == 1)
+        #expect(entries.first?.key == "pref")
+        #expect(entries.first?.value == "value-1")
     }
 }
 
