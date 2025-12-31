@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.3 — Unreleased
+## 0.1.3 — 2025-12-31
 - Local storage: add a Chromium LevelDB reader with Snappy support for localStorage entries.
 - Tests: use Swift Testing for local storage reader coverage.
 
