@@ -353,7 +353,6 @@ public enum ChromiumLocalStorageReader {
 
         return results
     }
-
 }
 
 #endif

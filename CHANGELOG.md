@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 — 2025-12-31
+- Chromium LevelDB: add helper API for raw text entry and token scanning.
+- Tests: expand Snappy + LevelDB table coverage (compressed + raw).
+
 ## 0.1.3 — 2025-12-31
 - Local storage: add a Chromium LevelDB reader with Snappy support for localStorage entries.
 - Tests: use Swift Testing for local storage reader coverage.
