@@ -420,6 +420,5 @@ enum ChromeCookieImporter {
         }
     }
 
-    // Chromium roots now centralized in ChromiumProfileLocator.
 }
 #endif
