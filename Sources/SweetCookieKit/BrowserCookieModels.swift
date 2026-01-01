@@ -23,6 +23,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case edge
     case edgeBeta
     case edgeCanary
+    case helium
     case vivaldi
 
     /// Display name for UI or logs.
@@ -44,6 +45,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         case .edge: "Microsoft Edge"
         case .edgeBeta: "Microsoft Edge Beta"
         case .edgeCanary: "Microsoft Edge Canary"
+        case .helium: "Helium"
         case .vivaldi: "Vivaldi"
         }
     }
@@ -58,6 +60,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         .arc,
         .chatgptAtlas,
         .chromium,
+        .helium,
         .vivaldi,
         .firefox,
         .chromeBeta,
@@ -92,6 +95,94 @@ enum BrowserEngine: Sendable {
 public enum BrowserCookieDefaults {
     /// Preferred order to search for cookies when no user preference exists.
     public static let importOrder: [Browser] = Browser.defaultImportOrder
+}
+
+/// Chromium profile root locations for supported browsers.
+public struct ChromiumProfileRoot: Sendable {
+    public let browser: Browser
+    public let url: URL
+
+    public var labelPrefix: String { self.browser.displayName }
+
+    public init(browser: Browser, url: URL) {
+        self.browser = browser
+        self.url = url
+    }
+}
+
+public enum ChromiumProfileLocator {
+    /// Returns Chromium profile roots for the given browsers and home directories.
+    public static func roots(
+        for browsers: [Browser] = Browser.defaultImportOrder,
+        homeDirectories: [URL] = BrowserCookieClient.defaultHomeDirectories()) -> [ChromiumProfileRoot]
+    {
+        let homes = self.uniqueHomes(homeDirectories)
+        let chromiumBrowsers = browsers.filter { $0.engine == .chromium }
+
+        var roots: [ChromiumProfileRoot] = []
+        roots.reserveCapacity(homes.count * chromiumBrowsers.count)
+        for home in homes {
+            let appSupport = home
+                .appendingPathComponent("Library")
+                .appendingPathComponent("Application Support")
+            for browser in chromiumBrowsers {
+                guard let relative = self.chromiumRelativePath(for: browser) else { continue }
+                roots.append(ChromiumProfileRoot(
+                    browser: browser,
+                    url: appSupport.appendingPathComponent(relative)))
+            }
+        }
+        return roots
+    }
+
+    static func chromiumRelativePath(for browser: Browser) -> String? {
+        switch browser {
+        case .chrome:
+            "Google/Chrome"
+        case .chromeBeta:
+            "Google/Chrome Beta"
+        case .chromeCanary:
+            "Google/Chrome Canary"
+        case .arc:
+            "Arc/User Data"
+        case .arcBeta:
+            "Arc Beta/User Data"
+        case .arcCanary:
+            "Arc Canary/User Data"
+        case .chatgptAtlas:
+            "com.openai.atlas/browser-data/host"
+        case .chromium:
+            "Chromium"
+        case .helium:
+            "net.imput.helium"
+        case .brave:
+            "BraveSoftware/Brave-Browser"
+        case .braveBeta:
+            "BraveSoftware/Brave-Browser-Beta"
+        case .braveNightly:
+            "BraveSoftware/Brave-Browser-Nightly"
+        case .edge:
+            "Microsoft Edge"
+        case .edgeBeta:
+            "Microsoft Edge Beta"
+        case .edgeCanary:
+            "Microsoft Edge Canary"
+        case .vivaldi:
+            "Vivaldi"
+        case .safari, .firefox:
+            nil
+        }
+    }
+
+    private static func uniqueHomes(_ homes: [URL]) -> [URL] {
+        var seen = Set<String>()
+        return homes.filter { home in
+            let path = home.path
+            guard !seen.contains(path) else { return false }
+            seen.insert(path)
+            return true
+        }
+    }
 }
 
 extension Collection<Browser> {

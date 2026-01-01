@@ -41,8 +41,10 @@ enum ChromeCookieImporter {
 
     static func availableStores(for browser: Browser, homeDirectories: [URL]) -> [BrowserCookieStore] {
         guard browser.engine == .chromium else { return [] }
-        let roots = self.chromiumRoots(for: browser, homeDirectories: homeDirectories)
         let labelPrefix = browser.displayName
+        let roots = ChromiumProfileLocator
+            .roots(for: [browser], homeDirectories: homeDirectories)
+            .map(\.url)
 
         var candidates: [ChromeProfileCandidate] = []
         for root in roots {
@@ -207,6 +209,8 @@ enum ChromeCookieImporter {
             ("ChatGPT Atlas Safe Storage", "ChatGPT Atlas"),
             ("ChatGPT Atlas Safe Storage", "com.openai.atlas"),
             ("com.openai.atlas Safe Storage", "com.openai.atlas"),
+            ("Helium Safe Storage", "Helium"),
+            ("net.imput.helium Safe Storage", "net.imput.helium"),
             ("Microsoft Edge Safe Storage", "Microsoft Edge"),
             ("Vivaldi Safe Storage", "Vivaldi"),
         ]
@@ -416,52 +420,6 @@ enum ChromeCookieImporter {
         }
     }
 
-    private static func chromiumRoots(for browser: Browser, homeDirectories: [URL]) -> [URL] {
-        let relativePath = self.chromiumRelativePath(for: browser)
-        guard !relativePath.isEmpty else { return [] }
-        return homeDirectories.map { home in
-            home
-                .appendingPathComponent("Library")
-                .appendingPathComponent("Application Support")
-                .appendingPathComponent(relativePath)
-        }
-    }
-
-    private static func chromiumRelativePath(for browser: Browser) -> String {
-        switch browser {
-        case .chrome:
-            "Google/Chrome"
-        case .chromeBeta:
-            "Google/Chrome Beta"
-        case .chromeCanary:
-            "Google/Chrome Canary"
-        case .arc:
-            "Arc/User Data"
-        case .arcBeta:
-            "Arc Beta/User Data"
-        case .arcCanary:
-            "Arc Canary/User Data"
-        case .chatgptAtlas:
-            "com.openai.atlas/browser-data/host"
-        case .chromium:
-            "Chromium"
-        case .brave:
-            "BraveSoftware/Brave-Browser"
-        case .braveBeta:
-            "BraveSoftware/Brave-Browser-Beta"
-        case .braveNightly:
-            "BraveSoftware/Brave-Browser-Nightly"
-        case .edge:
-            "Microsoft Edge"
-        case .edgeBeta:
-            "Microsoft Edge Beta"
-        case .edgeCanary:
-            "Microsoft Edge Canary"
-        case .vivaldi:
-            "Vivaldi"
-        case .safari, .firefox:
-            ""
-        }
-    }
+    // Chromium roots now centralized in ChromiumProfileLocator.
 }
 #endif
