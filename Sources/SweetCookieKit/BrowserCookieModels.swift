@@ -24,6 +24,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case edgeBeta
     case edgeCanary
     case vivaldi
+    case helium
 
     /// Display name for UI or logs.
     public var displayName: String {
@@ -45,6 +46,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         case .edgeBeta: "Microsoft Edge Beta"
         case .edgeCanary: "Microsoft Edge Canary"
         case .vivaldi: "Vivaldi"
+        case .helium: "Helium"
         }
     }
 
@@ -59,6 +61,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         .chatgptAtlas,
         .chromium,
         .vivaldi,
+        .helium,
         .firefox,
         .chromeBeta,
         .chromeCanary,

@@ -209,6 +209,7 @@ enum ChromeCookieImporter {
             ("com.openai.atlas Safe Storage", "com.openai.atlas"),
             ("Microsoft Edge Safe Storage", "Microsoft Edge"),
             ("Vivaldi Safe Storage", "Vivaldi"),
+            ("Helium Safe Storage", "Helium"),
         ]
 
         if let context = Self.preflightSafeStoragePrompt(labels: labels) {
@@ -459,6 +460,8 @@ enum ChromeCookieImporter {
             "Microsoft Edge Canary"
         case .vivaldi:
             "Vivaldi"
+        case .helium:
+            "Helium/User Data"
         case .safari, .firefox:
             ""
         }
