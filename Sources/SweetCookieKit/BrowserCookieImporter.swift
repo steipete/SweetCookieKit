@@ -45,7 +45,7 @@ public struct BrowserCookieClient: Sendable {
                 for: browser,
                 homeDirectories: self.configuration.homeDirectories)
         case .firefox:
-            return FirefoxCookieImporter.availableStores(homeDirectories: self.configuration.homeDirectories)
+            return FirefoxCookieImporter.availableStores(for: browser, homeDirectories: self.configuration.homeDirectories)
         }
     }
 
