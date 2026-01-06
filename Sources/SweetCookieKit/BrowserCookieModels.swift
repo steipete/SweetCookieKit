@@ -17,6 +17,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case chatgptAtlas
     case chromium
     case firefox
+    case zen
     case brave
     case braveBeta
     case braveNightly
@@ -39,6 +40,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         case .chatgptAtlas: "ChatGPT Atlas"
         case .chromium: "Chromium"
         case .firefox: "Firefox"
+        case .zen: "Zen"
         case .brave: "Brave"
         case .braveBeta: "Brave Beta"
         case .braveNightly: "Brave Nightly"
@@ -63,6 +65,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         .helium,
         .vivaldi,
         .firefox,
+        .zen,
         .chromeBeta,
         .chromeCanary,
         .arcBeta,
@@ -77,7 +80,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         switch self {
         case .safari:
             .webkit
-        case .firefox:
+        case .firefox, .zen:
             .firefox
         default:
             .chromium
@@ -169,7 +172,7 @@ public enum ChromiumProfileLocator {
             "Microsoft Edge Canary"
         case .vivaldi:
             "Vivaldi"
-        case .safari, .firefox:
+        case .safari, .firefox, .zen:
             nil
         }
     }

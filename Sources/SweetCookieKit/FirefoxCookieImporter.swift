@@ -29,12 +29,25 @@ enum FirefoxCookieImporter {
         let isHTTPOnly: Bool
     }
 
-    static func availableStores(homeDirectories: [URL]) -> [BrowserCookieStore] {
+    static func availableStores(for browser: Browser, homeDirectories: [URL]) -> [BrowserCookieStore] {
+        let profilesFolder: String
+        let labelPrefix: String
+        switch browser {
+        case .firefox:
+            profilesFolder = "Firefox"
+            labelPrefix = "Firefox"
+        case .zen:
+            profilesFolder = "zen"
+            labelPrefix = "Zen"
+        default:
+            return []
+        }
+
         let roots: [URL] = homeDirectories.map { home in
             home
                 .appendingPathComponent("Library")
                 .appendingPathComponent("Application Support")
-                .appendingPathComponent("Firefox")
+                .appendingPathComponent(profilesFolder)
                 .appendingPathComponent("Profiles")
         }
 
@@ -42,8 +55,8 @@ enum FirefoxCookieImporter {
         for root in roots {
             candidates.append(contentsOf: Self.firefoxProfileCookieDBs(
                 root: root,
-                labelPrefix: "Firefox",
-                browser: .firefox))
+                labelPrefix: labelPrefix,
+                browser: browser))
         }
         return candidates
             .filter { FileManager.default.fileExists(atPath: $0.cookiesDB.path) }
