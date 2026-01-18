@@ -192,6 +192,10 @@ enum ChromeCookieImporter {
     // MARK: - Keychain + crypto
 
     private static func chromeSafeStorageKey() throws -> Data {
+        if BrowserCookieKeychainAccessGate.isDisabled {
+            throw ImportError.keychainDenied
+        }
+
         self.chromeSafeStorageKeyLock.lock()
         if let cached = self.cachedChromeSafeStorageKey {
             self.chromeSafeStorageKeyLock.unlock()
@@ -419,6 +423,5 @@ enum ChromeCookieImporter {
             ]
         }
     }
-
 }
 #endif

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.1 — 2026-01-18
+- Chromium: honor host app keychain access disable flag to suppress Safe Storage prompts.
+
 ## 0.2.0 — 2026-01-01
 - Chromium: add Helium support (profiles + keychain labels).
 - Chromium: centralize profile root discovery (new `ChromiumProfileLocator`).

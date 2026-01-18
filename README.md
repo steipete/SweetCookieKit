@@ -15,7 +15,7 @@ for selecting browsers and profiles, filtering by domain, and converting results
 ### Swift Package Manager
 
 ```swift
-.package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.2.0")
+.package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.2.1")
 ```
 
 ## Usage
