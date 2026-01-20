@@ -10,6 +10,27 @@ struct BrowserMetadata: Sendable {
     let chromiumProfileRelativePath: String?
     let geckoProfilesFolder: String?
     let safeStorageLabels: [(service: String, account: String)]
+    let appBundleName: String?
+
+    init(
+        browser: Browser,
+        displayName: String,
+        engine: BrowserEngine,
+        defaultImportOrderRank: Int,
+        chromiumProfileRelativePath: String?,
+        geckoProfilesFolder: String?,
+        safeStorageLabels: [(service: String, account: String)],
+        appBundleName: String? = nil)
+    {
+        self.browser = browser
+        self.displayName = displayName
+        self.engine = engine
+        self.defaultImportOrderRank = defaultImportOrderRank
+        self.chromiumProfileRelativePath = chromiumProfileRelativePath
+        self.geckoProfilesFolder = geckoProfilesFolder
+        self.safeStorageLabels = safeStorageLabels
+        self.appBundleName = appBundleName
+    }
 }
 
 enum BrowserCatalog {
@@ -30,7 +51,8 @@ enum BrowserCatalog {
                 defaultImportOrderRank: 1,
                 chromiumProfileRelativePath: "Google/Chrome",
                 geckoProfilesFolder: nil,
-                safeStorageLabels: [("Chrome Safe Storage", "Chrome")]),
+                safeStorageLabels: [("Chrome Safe Storage", "Chrome")],
+                appBundleName: "Google Chrome"),
             BrowserMetadata(
                 browser: .edge,
                 displayName: "Microsoft Edge",
@@ -46,7 +68,8 @@ enum BrowserCatalog {
                 defaultImportOrderRank: 3,
                 chromiumProfileRelativePath: "BraveSoftware/Brave-Browser",
                 geckoProfilesFolder: nil,
-                safeStorageLabels: [("Brave Safe Storage", "Brave")]),
+                safeStorageLabels: [("Brave Safe Storage", "Brave")],
+                appBundleName: "Brave Browser"),
             BrowserMetadata(
                 browser: .arc,
                 displayName: "Arc",
@@ -125,7 +148,8 @@ enum BrowserCatalog {
                 defaultImportOrderRank: 12,
                 chromiumProfileRelativePath: "Google/Chrome Beta",
                 geckoProfilesFolder: nil,
-                safeStorageLabels: []),
+                safeStorageLabels: [],
+                appBundleName: "Google Chrome Beta"),
             BrowserMetadata(
                 browser: .chromeCanary,
                 displayName: "Chrome Canary",
@@ -133,7 +157,8 @@ enum BrowserCatalog {
                 defaultImportOrderRank: 13,
                 chromiumProfileRelativePath: "Google/Chrome Canary",
                 geckoProfilesFolder: nil,
-                safeStorageLabels: []),
+                safeStorageLabels: [],
+                appBundleName: "Google Chrome Canary"),
             BrowserMetadata(
                 browser: .arcBeta,
                 displayName: "Arc Beta",
@@ -157,7 +182,8 @@ enum BrowserCatalog {
                 defaultImportOrderRank: 16,
                 chromiumProfileRelativePath: "BraveSoftware/Brave-Browser-Beta",
                 geckoProfilesFolder: nil,
-                safeStorageLabels: []),
+                safeStorageLabels: [],
+                appBundleName: "Brave Browser Beta"),
             BrowserMetadata(
                 browser: .braveNightly,
                 displayName: "Brave Nightly",
@@ -165,7 +191,8 @@ enum BrowserCatalog {
                 defaultImportOrderRank: 17,
                 chromiumProfileRelativePath: "BraveSoftware/Brave-Browser-Nightly",
                 geckoProfilesFolder: nil,
-                safeStorageLabels: []),
+                safeStorageLabels: [],
+                appBundleName: "Brave Browser Nightly"),
             BrowserMetadata(
                 browser: .edgeBeta,
                 displayName: "Microsoft Edge Beta",

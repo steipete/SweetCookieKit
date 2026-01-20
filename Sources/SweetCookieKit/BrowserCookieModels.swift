@@ -33,6 +33,39 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
         BrowserCatalog.metadata(for: self).displayName
     }
 
+    /// Bundle display name used for locating the app on disk.
+    public var appBundleName: String {
+        BrowserCatalog.metadata(for: self).appBundleName ?? self.displayName
+    }
+
+    /// Relative Chromium profile root under ~/Library/Application Support.
+    public var chromiumProfileRelativePath: String? {
+        BrowserCatalog.metadata(for: self).chromiumProfileRelativePath
+    }
+
+    /// Gecko profiles folder under ~/Library/Application Support.
+    public var geckoProfilesFolder: String? {
+        BrowserCatalog.metadata(for: self).geckoProfilesFolder
+    }
+
+    public var usesChromiumProfileStore: Bool {
+        self.chromiumProfileRelativePath != nil
+    }
+
+    public var usesGeckoProfileStore: Bool {
+        self.geckoProfilesFolder != nil
+    }
+
+    /// Keychain Safe Storage labels for this browser.
+    public var safeStorageLabels: [(service: String, account: String)] {
+        BrowserCatalog.metadata(for: self).safeStorageLabels
+    }
+
+    /// Ordered Safe Storage labels used for preflighting prompts.
+    public static var safeStorageLabels: [(service: String, account: String)] {
+        BrowserCatalog.safeStorageLabels
+    }
+
     /// Preferred order to search for cookies when no user preference exists.
     /// Try all supported browsers by default; callers can pass a smaller list.
     public static let defaultImportOrder: [Browser] = BrowserCatalog.defaultImportOrder
