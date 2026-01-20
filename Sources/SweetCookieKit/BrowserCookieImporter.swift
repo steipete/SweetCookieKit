@@ -45,7 +45,7 @@ public struct BrowserCookieClient: Sendable {
                 for: browser,
                 homeDirectories: self.configuration.homeDirectories)
         case .firefox:
-            return FirefoxCookieImporter.availableStores(homeDirectories: self.configuration.homeDirectories)
+            return FirefoxCookieImporter.availableStores(for: browser, homeDirectories: self.configuration.homeDirectories)
         }
     }
 
@@ -173,7 +173,7 @@ public struct BrowserCookieClient: Sendable {
             } catch {
                 throw BrowserCookieError.loadFailed(
                     browser: store.browser,
-                    details: "Firefox cookie load failed: \(error.localizedDescription)")
+                    details: "\(store.browser.displayName) cookie load failed: \(error.localizedDescription)")
             }
         }
 

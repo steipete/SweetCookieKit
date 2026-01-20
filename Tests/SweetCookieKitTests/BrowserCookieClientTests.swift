@@ -34,6 +34,7 @@ struct BrowserCookieClientTests {
         #expect(order.first == .safari)
         #expect(order.contains(.chrome))
         #expect(order.contains(.firefox))
+        #expect(order.contains(.zen))
         #expect(Set(order).count == order.count)
 
         let shortList: [Browser] = [.safari, .chrome, .firefox]

@@ -5,16 +5,18 @@ import SQLite3
 /// Reads cookies from Firefox profile cookie DBs (macOS).
 enum FirefoxCookieImporter {
     enum ImportError: LocalizedError {
-        case cookieDBNotFound(path: String)
-        case cookieDBNotReadable(path: String)
-        case sqliteFailed(message: String)
+        case cookieDBNotFound(path: String, browser: Browser)
+        case cookieDBNotReadable(path: String, browser: Browser)
+        case sqliteFailed(message: String, browser: Browser)
 
         var errorDescription: String? {
             switch self {
-            case let .cookieDBNotFound(path): "Firefox cookie DB not found at \(path)."
-            case let .cookieDBNotReadable(path):
-                "Firefox cookie DB exists but is not readable (\(path))."
-            case let .sqliteFailed(message): "Failed to read Firefox cookies: \(message)"
+            case let .cookieDBNotFound(path, browser):
+                "\(browser.displayName) cookie DB not found at \(path)."
+            case let .cookieDBNotReadable(path, browser):
+                "\(browser.displayName) cookie DB exists but is not readable (\(path))."
+            case let .sqliteFailed(message, browser):
+                "Failed to read \(browser.displayName) cookies: \(message)"
             }
         }
     }
@@ -29,12 +31,25 @@ enum FirefoxCookieImporter {
         let isHTTPOnly: Bool
     }
 
-    static func availableStores(homeDirectories: [URL]) -> [BrowserCookieStore] {
+    static func availableStores(for browser: Browser, homeDirectories: [URL]) -> [BrowserCookieStore] {
+        let profilesFolder: String
+        let labelPrefix: String
+        switch browser {
+        case .firefox:
+            profilesFolder = "Firefox"
+            labelPrefix = "Firefox"
+        case .zen:
+            profilesFolder = "zen"
+            labelPrefix = "Zen"
+        default:
+            return []
+        }
+
         let roots: [URL] = homeDirectories.map { home in
             home
                 .appendingPathComponent("Library")
                 .appendingPathComponent("Application Support")
-                .appendingPathComponent("Firefox")
+                .appendingPathComponent(profilesFolder)
                 .appendingPathComponent("Profiles")
         }
 
@@ -42,8 +57,8 @@ enum FirefoxCookieImporter {
         for root in roots {
             candidates.append(contentsOf: Self.firefoxProfileCookieDBs(
                 root: root,
-                labelPrefix: "Firefox",
-                browser: .firefox))
+                labelPrefix: labelPrefix,
+                browser: browser))
         }
         return candidates
             .filter { FileManager.default.fileExists(atPath: $0.cookiesDB.path) }
@@ -63,12 +78,15 @@ enum FirefoxCookieImporter {
         domainMatch: BrowserCookieDomainMatch) throws -> [CookieRecord]
     {
         guard let sourceDB = store.databaseURL else {
-            throw ImportError.cookieDBNotFound(path: "Missing cookie DB for \(store.label)")
+            throw ImportError.cookieDBNotFound(
+                path: "Missing cookie DB for \(store.label)",
+                browser: store.browser)
         }
         return try Self.readCookiesFromLockedFirefoxDB(
             sourceDB: sourceDB,
             matchingDomains: domains,
-            domainMatch: domainMatch)
+            domainMatch: domainMatch,
+            browser: store.browser)
     }
 
     // MARK: - DB copy helper
@@ -76,10 +94,11 @@ enum FirefoxCookieImporter {
     private static func readCookiesFromLockedFirefoxDB(
         sourceDB: URL,
         matchingDomains: [String],
-        domainMatch: BrowserCookieDomainMatch) throws -> [CookieRecord]
+        domainMatch: BrowserCookieDomainMatch,
+        browser: Browser) throws -> [CookieRecord]
     {
         guard FileManager.default.isReadableFile(atPath: sourceDB.path) else {
-            throw ImportError.cookieDBNotReadable(path: sourceDB.path)
+            throw ImportError.cookieDBNotReadable(path: sourceDB.path, browser: browser)
         }
 
         let tempDir = FileManager.default.temporaryDirectory
@@ -102,7 +121,8 @@ enum FirefoxCookieImporter {
         return try Self.readCookies(
             fromDB: copiedDB.path,
             matchingDomains: matchingDomains,
-            domainMatch: domainMatch)
+            domainMatch: domainMatch,
+            browser: browser)
     }
 
     // MARK: - SQLite read
@@ -110,11 +130,12 @@ enum FirefoxCookieImporter {
     private static func readCookies(
         fromDB path: String,
         matchingDomains: [String],
-        domainMatch: BrowserCookieDomainMatch) throws -> [CookieRecord]
+        domainMatch: BrowserCookieDomainMatch,
+        browser: Browser) throws -> [CookieRecord]
     {
         var db: OpaquePointer?
         if sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) != SQLITE_OK {
-            throw ImportError.sqliteFailed(message: String(cString: sqlite3_errmsg(db)))
+            throw ImportError.sqliteFailed(message: String(cString: sqlite3_errmsg(db)), browser: browser)
         }
         defer { sqlite3_close(db) }
 
@@ -130,7 +151,7 @@ enum FirefoxCookieImporter {
 
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
-            throw ImportError.sqliteFailed(message: String(cString: sqlite3_errmsg(db)))
+            throw ImportError.sqliteFailed(message: String(cString: sqlite3_errmsg(db)), browser: browser)
         }
         defer { sqlite3_finalize(stmt) }
 
