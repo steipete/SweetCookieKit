@@ -217,6 +217,7 @@ enum ChromeCookieImporter {
             ("net.imput.helium Safe Storage", "net.imput.helium"),
             ("Microsoft Edge Safe Storage", "Microsoft Edge"),
             ("Vivaldi Safe Storage", "Vivaldi"),
+            ("Dia Safe Storage", "Dia"),
         ]
 
         if let context = Self.preflightSafeStoragePrompt(labels: labels) {

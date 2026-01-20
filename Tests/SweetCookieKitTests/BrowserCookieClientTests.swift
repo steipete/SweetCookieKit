@@ -33,6 +33,7 @@ struct BrowserCookieClientTests {
         let order = Browser.defaultImportOrder
         #expect(order.first == .safari)
         #expect(order.contains(.chrome))
+        #expect(order.contains(.dia))
         #expect(order.contains(.firefox))
         #expect(order.contains(.zen))
         #expect(Set(order).count == order.count)

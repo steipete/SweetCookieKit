@@ -2,6 +2,7 @@
 
 ## 0.2.2 — 2026-01-20
 - Firefox: add Zen browser support. (#3, thanks @vnixx)
+- Chromium: add Dia browser support. (#2, thanks @archodev)
 
 ## 0.2.1 — 2026-01-18
 - Chromium: honor host app keychain access disable flag to suppress Safe Storage prompts.
