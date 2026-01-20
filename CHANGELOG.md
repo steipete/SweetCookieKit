@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.2 — 2026-01-20
+## 0.3.0 — 2026-01-20
 - Firefox: add Zen browser support. (#3, thanks @vnixx)
 - Chromium: add Dia browser support. (#2, thanks @archodev)
 - Refactor: centralize browser metadata and Gecko importer wiring.
