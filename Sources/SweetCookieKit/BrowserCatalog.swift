@@ -209,6 +209,14 @@ enum BrowserCatalog {
                 chromiumProfileRelativePath: "Microsoft Edge Canary",
                 geckoProfilesFolder: nil,
                 safeStorageLabels: []),
+            BrowserMetadata(
+                browser: .comet,
+                displayName: "Comet",
+                engine: .chromium,
+                defaultImportOrderRank: 20,
+                chromiumProfileRelativePath: "Comet",
+                geckoProfilesFolder: nil,
+                safeStorageLabels: [("Comet Safe Storage", "Comet")]),
         ]
 
         var map: [Browser: BrowserMetadata] = [:]
@@ -247,6 +255,7 @@ enum BrowserCatalog {
             .edge,
             .vivaldi,
             .dia,
+            .comet,
         ]
         return labelOrder.flatMap { metadata(for: $0).safeStorageLabels }
     }()

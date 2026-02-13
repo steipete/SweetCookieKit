@@ -27,6 +27,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case helium
     case vivaldi
     case dia
+    case comet
 
     /// Display name for UI or logs.
     public var displayName: String {
