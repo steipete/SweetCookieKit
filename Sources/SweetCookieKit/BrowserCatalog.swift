@@ -114,8 +114,7 @@ enum BrowserCatalog {
                 chromiumProfileRelativePath: "net.imput.helium",
                 geckoProfilesFolder: nil,
                 safeStorageLabels: [
-                    ("Helium Safe Storage", "Helium"),
-                    ("net.imput.helium Safe Storage", "net.imput.helium"),
+                    ("Helium Storage Key", "Helium"),
                 ]),
             BrowserMetadata(
                 browser: .vivaldi,
