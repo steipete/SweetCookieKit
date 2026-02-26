@@ -13,7 +13,7 @@ import SQLite3
 ///   AES-CBC + PBKDF2. This is inherently brittle across Chromium changes; keep it best-effort.
 enum ChromeCookieImporter {
     private static let chromeSafeStorageKeyLock = NSLock()
-    private nonisolated(unsafe) static var cachedChromeSafeStorageKey: Data?
+    private nonisolated(unsafe) static var cachedSafeStorageKeys: [Browser: Data] = [:]
 
     enum ImportError: LocalizedError {
         case cookieDBNotFound(path: String)
@@ -73,7 +73,7 @@ enum ChromeCookieImporter {
         guard let sourceDB = store.databaseURL else {
             throw ImportError.cookieDBNotFound(path: "Missing cookie DB for \(store.label)")
         }
-        let chromeKey = try Self.chromeSafeStorageKey()
+        let chromeKey = try Self.chromeSafeStorageKey(for: store.browser)
         return try Self.readCookiesFromLockedChromeDB(
             sourceDB: sourceDB,
             key: chromeKey,
@@ -191,19 +191,19 @@ enum ChromeCookieImporter {
 
     // MARK: - Keychain + crypto
 
-    private static func chromeSafeStorageKey() throws -> Data {
+    private static func chromeSafeStorageKey(for browser: Browser) throws -> Data {
         if BrowserCookieKeychainAccessGate.isDisabled {
             throw ImportError.keychainDenied
         }
 
         self.chromeSafeStorageKeyLock.lock()
-        if let cached = self.cachedChromeSafeStorageKey {
+        if let cached = self.cachedSafeStorageKeys[browser] {
             self.chromeSafeStorageKeyLock.unlock()
             return cached
         }
         self.chromeSafeStorageKeyLock.unlock()
 
-        let labels = BrowserCatalog.safeStorageLabels
+        let labels = browser.safeStorageLabels
 
         if let context = Self.preflightSafeStoragePrompt(labels: labels) {
             BrowserCookieKeychainPromptHandler.handler?(context)
@@ -246,7 +246,7 @@ enum ChromeCookieImporter {
         }
 
         self.chromeSafeStorageKeyLock.lock()
-        self.cachedChromeSafeStorageKey = key
+        self.cachedSafeStorageKeys[browser] = key
         self.chromeSafeStorageKeyLock.unlock()
         return key
     }
