@@ -51,6 +51,7 @@ struct BrowserCatalogTests {
         #expect(labels.contains("Chrome Safe Storage|Chrome"))
         #expect(labels.contains("Dia Safe Storage|Dia"))
         #expect(labels.contains("ChatGPT Atlas Safe Storage|ChatGPT Atlas"))
+        #expect(labels.contains("Yandex Browser Safe Storage|Yandex Browser"))
     }
 
     @Test
@@ -60,12 +61,14 @@ struct BrowserCatalogTests {
         #expect(Browser.chromeCanary.appBundleName == "Google Chrome Canary")
         #expect(Browser.brave.appBundleName == "Brave Browser")
         #expect(Browser.braveNightly.appBundleName == "Brave Browser Nightly")
+        #expect(Browser.yandex.appBundleName == "Yandex Browser")
         #expect(Browser.safari.appBundleName == "Safari")
     }
 
     @Test
     func browserMetadata_helpersExposeProfileRoots() {
         #expect(Browser.chrome.chromiumProfileRelativePath == "Google/Chrome")
+        #expect(Browser.yandex.chromiumProfileRelativePath == "Yandex/YandexBrowser")
         #expect(Browser.firefox.geckoProfilesFolder == "Firefox")
         #expect(Browser.zen.geckoProfilesFolder == "zen")
         #expect(Browser.safari.chromiumProfileRelativePath == nil)
@@ -75,6 +78,8 @@ struct BrowserCatalogTests {
     func browserMetadata_helpersExposeSafeStorageLabels() {
         let chromeLabels = Browser.chrome.safeStorageLabels.map { "\($0.service)|\($0.account)" }
         #expect(chromeLabels.contains("Chrome Safe Storage|Chrome"))
+        let yandexLabels = Browser.yandex.safeStorageLabels.map { "\($0.service)|\($0.account)" }
+        #expect(yandexLabels.contains("Yandex Browser Safe Storage|Yandex Browser"))
         #expect(Browser.safari.safeStorageLabels.isEmpty)
     }
 }

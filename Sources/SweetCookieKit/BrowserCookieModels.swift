@@ -16,6 +16,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case arcCanary
     case chatgptAtlas
     case chromium
+    case yandex
     case firefox
     case zen
     case brave
