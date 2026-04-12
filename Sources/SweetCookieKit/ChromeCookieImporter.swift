@@ -73,7 +73,7 @@ enum ChromeCookieImporter {
         guard let sourceDB = store.databaseURL else {
             throw ImportError.cookieDBNotFound(path: "Missing cookie DB for \(store.label)")
         }
-        let chromeKey = try Self.chromeSafeStorageKey()
+        let chromeKey = try Self.chromeSafeStorageKey(for: store.browser)
         return try Self.readCookiesFromLockedChromeDB(
             sourceDB: sourceDB,
             key: chromeKey,
@@ -191,7 +191,16 @@ enum ChromeCookieImporter {
 
     // MARK: - Keychain + crypto
 
-    private static func chromeSafeStorageKey() throws -> Data {
+    static func chromeSafeStorageKey(for browser: Browser) throws -> Data {
+        try Self.chromeSafeStorageKey(for: browser, passwordLookup: Self.findGenericPassword)
+    }
+
+    typealias SafeStoragePasswordLookup = @Sendable (_ service: String, _ account: String, _ allowInteraction: Bool) -> (status: OSStatus, password: String?)
+
+    static func chromeSafeStorageKey(
+        for browser: Browser,
+        passwordLookup: @escaping SafeStoragePasswordLookup) throws -> Data
+    {
         if BrowserCookieKeychainAccessGate.isDisabled {
             throw ImportError.keychainDenied
         }
@@ -203,18 +212,15 @@ enum ChromeCookieImporter {
         }
         self.chromeSafeStorageKeyLock.unlock()
 
-        let labels = BrowserCatalog.safeStorageLabels
+        let labels = browser.safeStorageLabels
 
-        if let context = Self.preflightSafeStoragePrompt(labels: labels) {
+        if let context = Self.preflightSafeStoragePrompt(labels: labels, passwordLookup: passwordLookup) {
             BrowserCookieKeychainPromptHandler.handler?(context)
         }
 
         var password: String?
         for label in labels {
-            let result = Self.findGenericPassword(
-                service: label.service,
-                account: label.account,
-                allowInteraction: true)
+            let result = passwordLookup(label.service, label.account, true)
             if let p = result.password {
                 password = p
                 break
@@ -309,13 +315,11 @@ enum ChromeCookieImporter {
     }
 
     private static func preflightSafeStoragePrompt(
-        labels: [(service: String, account: String)]) -> BrowserCookieKeychainPromptContext?
+        labels: [(service: String, account: String)],
+        passwordLookup: SafeStoragePasswordLookup) -> BrowserCookieKeychainPromptContext?
     {
         for label in labels {
-            let result = Self.findGenericPassword(
-                service: label.service,
-                account: label.account,
-                allowInteraction: false)
+            let result = passwordLookup(label.service, label.account, false)
             switch result.status {
             case errSecSuccess:
                 if result.password != nil { return nil }

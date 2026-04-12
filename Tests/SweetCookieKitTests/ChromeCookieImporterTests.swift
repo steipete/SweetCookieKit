@@ -1,5 +1,6 @@
 import CommonCrypto
 import Foundation
+import Security
 import Testing
 @testable import SweetCookieKit
 
@@ -51,6 +52,40 @@ struct ChromeCookieImporterTests {
         #expect(status == kCCSuccess)
         out.count = outLength
         return out
+    }
+
+    @Test
+    func chromeSafeStorageKey_usesBrowserSpecificLabels() throws {
+        let recorder = LabelRecorder()
+        let key = try ChromeCookieImporter.chromeSafeStorageKey(
+            for: .yandex,
+            passwordLookup: { service, account, allowInteraction in
+                recorder.record(service: service, account: account, allowInteraction: allowInteraction)
+                return (status: errSecSuccess, password: "dummy-safe-storage-password")
+            })
+
+        #expect(key.count == kCCKeySizeAES128)
+        #expect(recorder.snapshot().map { "\($0.service)|\($0.account)|\($0.allowInteraction)" } == [
+            "Yandex Safe Storage|Yandex|false",
+            "Yandex Safe Storage|Yandex|true",
+        ])
+    }
+}
+
+private final class LabelRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var labels: [(service: String, account: String, allowInteraction: Bool)] = []
+
+    func record(service: String, account: String, allowInteraction: Bool = true) {
+        self.lock.lock()
+        self.labels.append((service: service, account: account, allowInteraction: allowInteraction))
+        self.lock.unlock()
+    }
+
+    func snapshot() -> [(service: String, account: String, allowInteraction: Bool)] {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        return self.labels
     }
 }
 
