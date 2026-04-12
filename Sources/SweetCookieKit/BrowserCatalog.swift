@@ -132,8 +132,8 @@ enum BrowserCatalog {
                 defaultImportOrderRank: 10,
                 chromiumProfileRelativePath: "Yandex/YandexBrowser",
                 geckoProfilesFolder: nil,
-                safeStorageLabels: [("Yandex Browser Safe Storage", "Yandex Browser")],
-                appBundleName: "Yandex Browser"),
+                safeStorageLabels: [("Yandex Safe Storage", "Yandex")],
+                appBundleName: "Yandex"),
             BrowserMetadata(
                 browser: .firefox,
                 displayName: "Firefox",
