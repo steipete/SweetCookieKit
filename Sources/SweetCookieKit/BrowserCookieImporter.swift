@@ -33,19 +33,13 @@ public struct BrowserCookieClient: Sendable {
     public func stores(for browser: Browser) -> [BrowserCookieStore] {
         switch browser.engine {
         case .webkit:
-            let profile = BrowserProfile(id: "safari.default", name: "Default")
-            return [BrowserCookieStore(
-                browser: .safari,
-                profile: profile,
-                kind: .safari,
-                label: "Safari",
-                databaseURL: nil)]
+            SafariCookieImporter.availableStores(homeDirectories: self.configuration.homeDirectories)
         case .chromium:
-            return ChromeCookieImporter.availableStores(
+            ChromeCookieImporter.availableStores(
                 for: browser,
                 homeDirectories: self.configuration.homeDirectories)
         case .gecko:
-            return GeckoCookieImporter.availableStores(for: browser, homeDirectories: self.configuration.homeDirectories)
+            GeckoCookieImporter.availableStores(for: browser, homeDirectories: self.configuration.homeDirectories)
         }
     }
 
@@ -108,6 +102,7 @@ public struct BrowserCookieClient: Sendable {
         case .webkit:
             do {
                 let loaded = try SafariCookieImporter.loadCookies(
+                    from: store,
                     matchingDomains: query.domains,
                     domainMatch: query.domainMatch,
                     homeDirectories: self.configuration.homeDirectories,

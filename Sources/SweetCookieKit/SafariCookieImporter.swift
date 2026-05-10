@@ -21,7 +21,7 @@ enum SafariCookieImporter {
         }
     }
 
-    struct CookieRecord: Sendable {
+    struct CookieRecord {
         let domain: String
         let name: String
         let path: String
@@ -29,6 +29,57 @@ enum SafariCookieImporter {
         let expires: Date?
         let isSecure: Bool
         let isHTTPOnly: Bool
+    }
+
+    static func availableStores(homeDirectories: [URL]) -> [BrowserCookieStore] {
+        var stores: [BrowserCookieStore] = []
+        var seenIDs = Set<String>()
+
+        for url in self.candidateCookieFiles(homeDirectories: homeDirectories) {
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            let descriptor = self.storeDescriptor(for: url)
+            var storeID = descriptor.id
+            if !seenIDs.insert(storeID).inserted {
+                storeID = "\(descriptor.id):\(url.path)"
+                _ = seenIDs.insert(storeID)
+            }
+
+            stores.append(BrowserCookieStore(
+                browser: .safari,
+                profile: BrowserProfile(id: storeID, name: descriptor.name),
+                kind: .safari,
+                label: descriptor.label,
+                databaseURL: url))
+        }
+
+        if stores.isEmpty {
+            return [self.defaultStore()]
+        }
+        return stores
+    }
+
+    static func loadCookies(
+        from store: BrowserCookieStore,
+        matchingDomains domains: [String],
+        domainMatch: BrowserCookieDomainMatch,
+        homeDirectories: [URL],
+        logger: ((String) -> Void)? = nil) throws -> [CookieRecord]
+    {
+        guard store.browser == .safari else {
+            throw ImportError.invalidFile
+        }
+        guard let databaseURL = store.databaseURL else {
+            return try self.loadCookies(
+                matchingDomains: domains,
+                domainMatch: domainMatch,
+                homeDirectories: homeDirectories,
+                logger: logger)
+        }
+        return try self.loadCookies(
+            from: databaseURL,
+            matchingDomains: domains,
+            domainMatch: domainMatch,
+            logger: logger)
     }
 
     static func loadCookies(
@@ -71,6 +122,37 @@ enum SafariCookieImporter {
             logger?("Safari cookies: last error: \(lastReadError)")
         }
         throw ImportError.cookieFileNotFound
+    }
+
+    private static func loadCookies(
+        from url: URL,
+        matchingDomains domains: [String],
+        domainMatch: BrowserCookieDomainMatch,
+        logger: ((String) -> Void)? = nil) throws -> [CookieRecord]
+    {
+        do {
+            let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue
+            logger?("Safari cookies: trying \(url.path) (\(size ?? -1) bytes)")
+            let data = try Data(contentsOf: url)
+            let records = try Self.parseBinaryCookies(data: data)
+            return records.filter { record in
+                BrowserCookieDomainMatcher.matches(
+                    domain: record.domain,
+                    patterns: domains,
+                    match: domainMatch)
+            }
+        } catch let error as CocoaError where error.code == .fileReadNoPermission {
+            logger?("Safari cookies: permission denied for \(url.path)")
+            throw ImportError.cookieFileNotReadable(path: url.path)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            logger?("Safari cookies: missing \(url.path)")
+            throw ImportError.cookieFileNotFound
+        } catch let error as ImportError {
+            throw error
+        } catch {
+            logger?("Safari cookies: failed to read \(url.path): \(error.localizedDescription)")
+            throw error
+        }
     }
 
     // MARK: - BinaryCookies parsing
@@ -173,12 +255,13 @@ enum SafariCookieImporter {
     private static func candidateCookieFiles(homeDirectories: [URL]) -> [URL] {
         let homes = self.candidateHomes(from: homeDirectories)
         var urls: [URL] = []
-        urls.reserveCapacity(homes.count * 2)
+        urls.reserveCapacity(homes.count * 4)
         for home in homes {
             urls.append(home.appendingPathComponent("Library/Cookies/Cookies.binarycookies"))
             urls.append(
                 home.appendingPathComponent(
                     "Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies"))
+            urls.append(contentsOf: self.websiteDataStoreCookieFiles(in: home))
         }
         var seen = Set<String>()
         return urls.filter { url in
@@ -189,6 +272,37 @@ enum SafariCookieImporter {
         }
     }
 
+    private static func websiteDataStoreCookieFiles(in home: URL) -> [URL] {
+        let roots = [
+            home.appendingPathComponent("Library/Containers/com.apple.Safari/Data/Library/WebKit/WebsiteDataStore"),
+            home.appendingPathComponent("Library/WebKit/WebsiteDataStore"),
+        ]
+
+        return roots.flatMap { root in
+            self.cookieFiles(in: root)
+        }
+    }
+
+    private static func cookieFiles(in root: URL) -> [URL] {
+        guard FileManager.default.fileExists(atPath: root.path),
+              let enumerator = FileManager.default.enumerator(
+                  at: root,
+                  includingPropertiesForKeys: [.isRegularFileKey],
+                  options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        else {
+            return []
+        }
+
+        var files: [URL] = []
+        for case let url as URL in enumerator {
+            guard url.lastPathComponent == "Cookies.binarycookies" else { continue }
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+            guard values?.isRegularFile != false else { continue }
+            files.append(url)
+        }
+        return files
+    }
+
     private static func candidateHomes(from homeDirectories: [URL]) -> [URL] {
         var seen = Set<String>()
         return homeDirectories.filter { home in
@@ -197,6 +311,39 @@ enum SafariCookieImporter {
             seen.insert(path)
             return true
         }
+    }
+
+    private static func defaultStore() -> BrowserCookieStore {
+        BrowserCookieStore(
+            browser: .safari,
+            profile: BrowserProfile(id: "safari.default", name: "Default"),
+            kind: .safari,
+            label: "Safari",
+            databaseURL: nil)
+    }
+
+    private static func storeDescriptor(for url: URL) -> (id: String, name: String, label: String) {
+        let components = url.pathComponents
+        if let index = components.firstIndex(of: "WebsiteDataStore"),
+           index + 1 < components.count
+        {
+            let token = components[index + 1]
+            return (
+                id: "safari.datastore.\(token)",
+                name: token,
+                label: "Safari (\(token))")
+        }
+
+        let path = url.path
+        if path.contains("/Library/Containers/com.apple.Safari/Data/Library/Cookies/") {
+            return (id: "safari.default", name: "Default", label: "Safari")
+        }
+        if path.contains("/Library/Cookies/") {
+            return (id: "safari.legacy", name: "Legacy", label: "Safari (Legacy)")
+        }
+
+        let name = url.deletingLastPathComponent().lastPathComponent
+        return (id: "safari.\(name)", name: name, label: "Safari (\(name))")
     }
 }
 

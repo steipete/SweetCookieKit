@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Safari: discover profile-specific `WebsiteDataStore` cookie files and load cookies from the selected Safari store. (thanks @przemyslaw-szurmak)
+- Tests: cover Safari fallback, profile store discovery, and selected-store cookie reads.
+
 ## 0.4.0 — 2026-01-20
 - Export browser metadata helpers for host app detection (bundle names, profile roots, Safe Storage labels).
 - Tests: cover browser metadata helper accessors and bundle name overrides.
