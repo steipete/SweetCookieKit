@@ -16,6 +16,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case arcCanary
     case chatgptAtlas
     case chromium
+    case yandex
     case firefox
     case zen
     case brave
@@ -76,7 +77,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     }
 }
 
-enum BrowserEngine: Sendable {
+enum BrowserEngine {
     case webkit
     case chromium
     case gecko
@@ -93,7 +94,9 @@ public struct ChromiumProfileRoot: Sendable {
     public let browser: Browser
     public let url: URL
 
-    public var labelPrefix: String { self.browser.displayName }
+    public var labelPrefix: String {
+        self.browser.displayName
+    }
 
     public init(browser: Browser, url: URL) {
         self.browser = browser

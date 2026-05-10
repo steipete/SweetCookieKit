@@ -2,6 +2,9 @@
 
 ## Unreleased
 - Safari: discover profile-specific `WebsiteDataStore` cookie files and load cookies from the selected Safari store. (thanks @przemyslaw-szurmak)
+- Chromium: add Comet browser support. (thanks @Hilo-Hilo)
+- Chromium: add Yandex Browser support and use per-browser Safe Storage keys. (thanks @serezha93)
+- Helium: use the `Helium Storage Key` Keychain label and avoid reusing another browser's cached Safe Storage key. (thanks @bald-ai)
 - Tests: cover Safari fallback, profile store discovery, and selected-store cookie reads.
 
 ## 0.4.0 — 2026-01-20
