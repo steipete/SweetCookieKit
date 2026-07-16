@@ -6,6 +6,7 @@ import Testing
 
 #if os(macOS)
 
+@Suite(.serialized)
 struct ChromeCookieImporterTests {
     @Test
     func `decrypt chromium value strips mac OSV 10 prefix`() {
