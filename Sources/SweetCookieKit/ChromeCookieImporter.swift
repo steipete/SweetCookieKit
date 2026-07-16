@@ -217,20 +217,31 @@ enum ChromeCookieImporter {
 
         let labels = Self.safeStorageLabels(for: browser)
 
-        if let context = Self.preflightSafeStoragePrompt(labels: labels, passwordLookup: passwordLookup) {
-            BrowserCookieKeychainPromptHandler.handler?(context)
-        }
-
-        var password: String?
         for label in labels {
-            let result = passwordLookup(label.service, label.account, true)
-            if let p = result.password {
-                password = p
-                break
+            let noUIResult = passwordLookup(label.service, label.account, false)
+            if let password = noUIResult.password {
+                return try Self.derivedChromeKey(for: browser, from: password)
+            }
+
+            guard noUIResult.status == errSecInteractionNotAllowed else { continue }
+            guard BrowserCookieKeychainAccessGate.isUserInteractionAllowed else {
+                throw ImportError.keychainDenied
+            }
+
+            BrowserCookieKeychainPromptHandler.handler?(BrowserCookieKeychainPromptContext(
+                service: label.service,
+                account: label.account,
+                label: label.service))
+            let interactiveResult = passwordLookup(label.service, label.account, true)
+            if let password = interactiveResult.password {
+                return try Self.derivedChromeKey(for: browser, from: password)
             }
         }
-        guard let password else { throw ImportError.keychainDenied }
 
+        throw ImportError.keychainDenied
+    }
+
+    private static func derivedChromeKey(for browser: Browser, from password: String) throws -> Data {
         let salt = Data("saltysalt".utf8)
         var key = Data(count: kCCKeySizeAES128)
         let keyLength = key.count
@@ -321,27 +332,6 @@ enum ChromeCookieImporter {
             i = value.index(after: i)
         }
         return String(value[i...])
-    }
-
-    private static func preflightSafeStoragePrompt(
-        labels: [(service: String, account: String)],
-        passwordLookup: SafeStoragePasswordLookup) -> BrowserCookieKeychainPromptContext?
-    {
-        for label in labels {
-            let result = passwordLookup(label.service, label.account, false)
-            switch result.status {
-            case errSecSuccess:
-                if result.password != nil { return nil }
-            case errSecInteractionNotAllowed:
-                return BrowserCookieKeychainPromptContext(
-                    service: label.service,
-                    account: label.account,
-                    label: label.service)
-            default:
-                continue
-            }
-        }
-        return nil
     }
 
     private static func safeStorageLabels(for browser: Browser) -> [(service: String, account: String)] {
