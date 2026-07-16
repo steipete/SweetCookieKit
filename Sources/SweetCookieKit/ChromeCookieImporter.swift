@@ -202,6 +202,7 @@ enum ChromeCookieImporter {
 
     static func chromeSafeStorageKey(
         for browser: Browser,
+        labels overrideLabels: [(service: String, account: String)]? = nil,
         passwordLookup: @escaping SafeStoragePasswordLookup) throws -> Data
     {
         if BrowserCookieKeychainAccessGate.isDisabled {
@@ -215,7 +216,7 @@ enum ChromeCookieImporter {
         }
         self.chromeSafeStorageKeyLock.unlock()
 
-        let labels = Self.safeStorageLabels(for: browser)
+        let labels = overrideLabels ?? Self.safeStorageLabels(for: browser)
 
         for label in labels {
             let noUIResult = passwordLookup(label.service, label.account, false)
@@ -224,7 +225,7 @@ enum ChromeCookieImporter {
             }
 
             guard noUIResult.status == errSecInteractionNotAllowed else { continue }
-            guard BrowserCookieKeychainAccessGate.isUserInteractionAllowed else {
+            guard !BrowserCookieKeychainAccessGate.isUserInteractionDisallowed else {
                 throw ImportError.keychainDenied
             }
 
@@ -236,6 +237,7 @@ enum ChromeCookieImporter {
             if let password = interactiveResult.password {
                 return try Self.derivedChromeKey(for: browser, from: password)
             }
+            throw ImportError.keychainDenied
         }
 
         throw ImportError.keychainDenied

@@ -7,13 +7,13 @@ public enum BrowserCookieKeychainAccessGate {
 
     /// Controls whether Chromium cookie decryption may promote a no-UI Keychain read to an interactive one.
     ///
-    /// The secure default keeps background imports non-interactive. Hosts that have obtained user intent can
-    /// opt in for the duration of a specific import with ``withUserInteractionAllowed(_:)``.
-    @TaskLocal public static var isUserInteractionAllowed = false
+    /// Interactive recovery remains the compatibility default. Hosts performing background work can suppress
+    /// it for the duration of a specific import with ``withUserInteractionDisallowed(_:)``.
+    @TaskLocal public static var isUserInteractionDisallowed = false
 
-    /// Runs an operation that may request user interaction from macOS Keychain.
-    public static func withUserInteractionAllowed<T>(_ operation: () throws -> T) rethrows -> T {
-        try self.$isUserInteractionAllowed.withValue(true) {
+    /// Runs an operation that must not request user interaction from macOS Keychain.
+    public static func withUserInteractionDisallowed<T>(_ operation: () throws -> T) rethrows -> T {
+        try self.$isUserInteractionDisallowed.withValue(true) {
             try operation()
         }
     }
