@@ -108,9 +108,20 @@ let tokens = ChromiumLevelDBReader.readTokenCandidates(in: levelDBURL, minimumLe
 ```swift
 import SweetCookieKit
 
-BrowserCookieKeychainPromptHandler.shared.handler = { context in
+BrowserCookieKeychainPromptHandler.handler = { context in
     // Show a blocking alert or custom UI before the system prompt appears.
     // context.kind = .chromiumSafeStorage
+}
+```
+
+- For background work that must not display Keychain UI, scope the import with
+  `withUserInteractionDisallowed`. SweetCookieKit tries every available Safe Storage
+  label without interaction, then returns `BrowserCookieError.accessDenied` if none
+  can be read without prompting:
+
+```swift
+let records = try BrowserCookieKeychainAccessGate.withUserInteractionDisallowed {
+    try client.records(matching: query, in: store!)
 }
 ```
 
