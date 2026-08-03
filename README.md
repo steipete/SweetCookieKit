@@ -81,6 +81,7 @@ The package includes DocC documentation and a standalone example executable:
 ```sh
 swift build
 swift test
+swiftlint --strict
 swift package --allow-writing-to-directory /tmp/SweetCookieKit-docc generate-documentation --target SweetCookieKit --disable-indexing --transform-for-static-hosting --output-path /tmp/SweetCookieKit-docc
 ```
 
