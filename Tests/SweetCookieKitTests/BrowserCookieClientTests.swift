@@ -28,6 +28,71 @@ struct BrowserCookieClientTests {
     }
 
     @Test
+    func `chromium parent and host cookie records remain distinguishable`() {
+        let fixtures: [(hostKey: String, scope: BrowserCookieScope)] = [
+            (".zoom.us", .domain),
+            ("zoom.us", .hostOnly),
+            (".ai.zoom.us", .domain),
+            ("ai.zoom.us", .hostOnly),
+        ]
+
+        for fixture in fixtures {
+            let chromiumRecord = ChromeCookieImporter.CookieRecord(
+                hostKey: fixture.hostKey,
+                name: "synthetic",
+                path: "/",
+                expiresUTC: 0,
+                isSecure: true,
+                isHTTPOnly: true,
+                value: "synthetic")
+            let record = BrowserCookieClient.makeBrowserCookieRecord(chromiumRecord)
+
+            #expect(record.domain == fixture.hostKey.trimmingPrefix("."))
+            #expect(record.scope == fixture.scope)
+            #expect(record.name == "synthetic")
+        }
+    }
+
+    @Test
+    func `public record initializer accepts normalized domain with explicit scope`() {
+        let record = BrowserCookieRecord(
+            domain: "zoom.us",
+            name: "synthetic",
+            path: "/",
+            value: "synthetic",
+            expires: nil,
+            isSecure: true,
+            isHTTPOnly: true,
+            scope: .domain)
+
+        #expect(record.domain == "zoom.us")
+        #expect(record.scope == .domain)
+    }
+
+    @Test
+    func `legacy record initializer infers scope from an unnormalized domain`() {
+        let domainCookie = BrowserCookieRecord(
+            domain: ".example.com",
+            name: "domain",
+            path: "/",
+            value: "synthetic",
+            expires: nil,
+            isSecure: true,
+            isHTTPOnly: true)
+        let hostCookie = BrowserCookieRecord(
+            domain: "example.com",
+            name: "host",
+            path: "/",
+            value: "synthetic",
+            expires: nil,
+            isSecure: true,
+            isHTTPOnly: true)
+
+        #expect(domainCookie.scope == .domain)
+        #expect(hostCookie.scope == .hostOnly)
+    }
+
+    @Test
     func `browser cookie import order labels`() {
         let order = Browser.defaultImportOrder
         #expect(order.first == .safari)

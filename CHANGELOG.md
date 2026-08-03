@@ -2,6 +2,8 @@
 
 ## 0.5.2 - Unreleased
 
+- Preserve host-only versus domain scope on normalized browser cookie records.
+
 ## 0.5.1 — 2026-08-01
 
 - Chromium: validate and strip schema-v24 domain hashes while preserving long and Unicode legacy cookie values. (#17, thanks @Yuxin-Qiao)

@@ -37,7 +37,7 @@ let cookies = try client.cookies(matching: query, in: store)
 print("Loaded \(cookies.count) cookies from \(store.profile.name)")
 ```
 
-`BrowserCookieClient` can return normalized `BrowserCookieRecord` values instead when the caller does not need `HTTPCookie` conversion. SweetCookieKit only reads browser data; it does not persist cookies.
+`BrowserCookieClient` can return normalized `BrowserCookieRecord` values instead when the caller does not need `HTTPCookie` conversion. Each record retains its original `scope`, so callers can distinguish a domain cookie such as Chromium's `.example.com` from a host-only `example.com` cookie after the leading dot is normalized away. SweetCookieKit only reads browser data; it does not persist cookies.
 
 ## Browsers and profiles
 

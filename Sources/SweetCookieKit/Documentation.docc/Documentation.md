@@ -57,5 +57,6 @@ and permission issues report `.accessDenied` with a user-facing hint in ``Browse
 - ``BrowserCookieQuery``
 - ``BrowserCookieDomainMatch``
 - ``BrowserCookieRecord``
+- ``BrowserCookieScope``
 - ``BrowserCookieStoreRecords``
 - ``BrowserCookieOriginStrategy``

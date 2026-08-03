@@ -289,10 +289,20 @@ public struct BrowserCookieStore: Sendable, Hashable {
     }
 }
 
+/// The browser's domain-matching policy for a cookie.
+public enum BrowserCookieScope: Sendable, Equatable {
+    /// The cookie is sent only to the exact host that created it.
+    case hostOnly
+    /// The cookie is sent to its domain and matching subdomains.
+    case domain
+}
+
 /// A browser cookie record normalized for cross-browser handling.
 public struct BrowserCookieRecord: Sendable {
     /// Cookie domain (normalized; leading dot removed).
     public let domain: String
+    /// Whether the browser stored this as an exact-host or domain cookie.
+    public let scope: BrowserCookieScope
     public let name: String
     public let path: String
     public let value: String
@@ -310,7 +320,29 @@ public struct BrowserCookieRecord: Sendable {
         isSecure: Bool,
         isHTTPOnly: Bool)
     {
+        self.init(
+            domain: domain,
+            name: name,
+            path: path,
+            value: value,
+            expires: expires,
+            isSecure: isSecure,
+            isHTTPOnly: isHTTPOnly,
+            scope: domain.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(".") ? .domain : .hostOnly)
+    }
+
+    public init(
+        domain: String,
+        name: String,
+        path: String,
+        value: String,
+        expires: Date?,
+        isSecure: Bool,
+        isHTTPOnly: Bool,
+        scope: BrowserCookieScope)
+    {
         self.domain = domain
+        self.scope = scope
         self.name = name
         self.path = path
         self.value = value

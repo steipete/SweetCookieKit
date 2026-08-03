@@ -115,7 +115,8 @@ public struct BrowserCookieClient: Sendable {
                         value: record.value,
                         expires: record.expires,
                         isSecure: record.isSecure,
-                        isHTTPOnly: record.isHTTPOnly)
+                        isHTTPOnly: record.isHTTPOnly,
+                        scope: BrowserCookieDomainMatcher.scope(forStoredDomain: record.domain))
                 }
             } catch let error as SafariCookieImporter.ImportError {
                 throw BrowserCookieError.mapSafariError(error, browser: store.browser)
@@ -130,16 +131,7 @@ public struct BrowserCookieClient: Sendable {
                     from: store,
                     matchingDomains: query.domains,
                     domainMatch: query.domainMatch)
-                records = loaded.map { record in
-                    BrowserCookieRecord(
-                        domain: BrowserCookieDomainMatcher.normalizeDomain(record.hostKey),
-                        name: record.name,
-                        path: record.path,
-                        value: record.value,
-                        expires: BrowserCookieDomainMatcher.chromeExpiryDate(expiresUTC: record.expiresUTC),
-                        isSecure: record.isSecure,
-                        isHTTPOnly: record.isHTTPOnly)
-                }
+                records = loaded.map(Self.makeBrowserCookieRecord)
             } catch let error as ChromeCookieImporter.ImportError {
                 throw BrowserCookieError.mapChromeError(error, browser: store.browser)
             } catch {
@@ -161,7 +153,8 @@ public struct BrowserCookieClient: Sendable {
                         value: record.value,
                         expires: record.expires,
                         isSecure: record.isSecure,
-                        isHTTPOnly: record.isHTTPOnly)
+                        isHTTPOnly: record.isHTTPOnly,
+                        scope: BrowserCookieDomainMatcher.scope(forStoredDomain: record.host))
                 }
             } catch let error as GeckoCookieImporter.ImportError {
                 throw BrowserCookieError.mapGeckoError(error, browser: store.browser)
@@ -176,6 +169,18 @@ public struct BrowserCookieClient: Sendable {
             records,
             includeExpired: query.includeExpired,
             now: query.referenceDate)
+    }
+
+    static func makeBrowserCookieRecord(_ record: ChromeCookieImporter.CookieRecord) -> BrowserCookieRecord {
+        BrowserCookieRecord(
+            domain: BrowserCookieDomainMatcher.normalizeDomain(record.hostKey),
+            name: record.name,
+            path: record.path,
+            value: record.value,
+            expires: BrowserCookieDomainMatcher.chromeExpiryDate(expiresUTC: record.expiresUTC),
+            isSecure: record.isSecure,
+            isHTTPOnly: record.isHTTPOnly,
+            scope: BrowserCookieDomainMatcher.scope(forStoredDomain: record.hostKey))
     }
 
     /// Loads `HTTPCookie` values from a specific cookie store.
@@ -274,9 +279,15 @@ public struct BrowserCookieClient: Sendable {
 }
 
 enum BrowserCookieDomainMatcher {
+    static func scope(forStoredDomain domain: String) -> BrowserCookieScope {
+        domain.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(".") ? .domain : .hostOnly
+    }
+
     static func normalizeDomain(_ raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix(".") { return String(trimmed.dropFirst()) }
+        if trimmed.hasPrefix(".") {
+            return String(trimmed.dropFirst())
+        }
         return trimmed
     }
 
