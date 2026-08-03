@@ -1,139 +1,89 @@
-# 🧁 SweetCookieKit — Native macOS cookie extraction for Safari, Chromium, and Firefox.
+# SweetCookieKit 🧁 — Browser cookies, served native.
 
-SweetCookieKit is a Swift 6 package for extracting browser cookies on macOS.
-It supports Safari, Chromium-based browsers, Firefox Release/Beta/Developer Edition/Nightly,
-and Zen, and provides a modern API
-for selecting browsers and profiles, filtering by domain, and converting results to
-`HTTPCookie` values.
+[![CI](https://img.shields.io/github/actions/workflow/status/steipete/SweetCookieKit/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/steipete/SweetCookieKit/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/steipete/SweetCookieKit?style=flat-square)](https://github.com/steipete/SweetCookieKit/releases/latest)
+[![Swift](https://img.shields.io/badge/Swift-6.2-F05138?style=flat-square)](https://swift.org)
+[![macOS](https://img.shields.io/badge/macOS-13%2B-000000?style=flat-square)](https://www.apple.com/macos/)
+[![License](https://img.shields.io/github/license/steipete/SweetCookieKit?style=flat-square)](LICENSE)
 
-## Requirements
-
-- macOS 13+
-- Swift 6
+SweetCookieKit is a Swift package that discovers profiles and reads cookies from Safari, Chromium-based browsers, Firefox, and Zen on macOS. It returns normalized records or `HTTPCookie` values for apps and command-line tools.
 
 ## Install
 
-### Swift Package Manager
+SweetCookieKit requires macOS 13 or newer and Swift 6.2 or newer. Add it to your Swift package:
 
 ```swift
-.package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.4.1")
+dependencies: [
+    .package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.5.1"),
+],
+targets: [
+    .target(name: "YourTarget", dependencies: ["SweetCookieKit"]),
+]
 ```
 
-## Usage
+## Quick start
 
-### List stores (profiles)
-
-```swift
-import SweetCookieKit
-
-let client = BrowserCookieClient()
-let stores = client.stores(for: .chrome)
-```
-
-### Fetch records from a specific store
+Choose a browser, discover its profiles, and read cookies matching a domain:
 
 ```swift
 import SweetCookieKit
 
 let client = BrowserCookieClient()
-let stores = client.stores(for: .chrome)
-let store = stores.first { $0.profile.name == "Default" }
-
-let query = BrowserCookieQuery(domains: ["example.com"])
-let records = try client.records(matching: query, in: store!)
+let query = BrowserCookieQuery(domains: ["example.com"], domainMatch: .suffix)
+guard let store = client.stores(for: .chrome).first else {
+    fatalError("Chrome cookie store not found")
+}
+let cookies = try client.cookies(matching: query, in: store)
+print("Loaded \(cookies.count) cookies from \(store.profile.name)")
 ```
 
-### Convert to `HTTPCookie`
+`BrowserCookieClient` can return normalized `BrowserCookieRecord` values instead when the caller does not need `HTTPCookie` conversion. SweetCookieKit only reads browser data; it does not persist cookies.
+
+## Browsers and profiles
+
+`Browser.defaultImportOrder` covers every supported Safari, Chromium, and Gecko browser. Pass a narrower list when the user has already chosen a source:
 
 ```swift
-let cookies = try client.cookies(matching: query, in: store!)
-```
-
-### Read Chromium local storage
-
-```swift
-import SweetCookieKit
-
-let entries = ChromiumLocalStorageReader.readEntries(
-    for: "https://example.com",
-    in: levelDBURL)
-```
-
-### Query options
-
-```swift
-let query = BrowserCookieQuery(
-    domains: ["example.com"],
-    domainMatch: .suffix,
-    includeExpired: false)
-```
-
-### Pick a browser order
-
-```swift
-let order = Browser.defaultImportOrder // tries all supported browsers by default
-for browser in order {
-    let results = try client.records(matching: query, in: browser)
-    // results are grouped per profile/store
+let stores = client.stores(in: [.safari, .chrome, .firefox])
+for store in stores {
+    print("\(store.browser.displayName): \(store.profile.name)")
 }
 ```
 
-## Example CLI
+Stores identify both the browser profile and the underlying cookie store. This lets an app show the available sources before it reads anything.
 
-See `Examples/CookieCLI` for a standalone SwiftPM executable that lists stores and exports cookies as JSON or HTTP headers.
+## Permissions and Keychain access
 
-```bash
-cd Examples/CookieCLI
-swift run SweetCookieCLI --help
-```
+Safari cookie access may require Full Disk Access. Chromium imports may ask macOS Keychain for that browser's Safe Storage credential so encrypted cookie values can be read.
 
-## Chromium LevelDB helpers
-
-When you need raw text entries or token candidates from Chromium LevelDB stores,
-use the LevelDB reader helpers (best-effort decoding).
-
-```swift
-import SweetCookieKit
-
-let entries = ChromiumLevelDBReader.readTextEntries(in: levelDBURL)
-let tokens = ChromiumLevelDBReader.readTokenCandidates(in: levelDBURL, minimumLength: 80)
-```
-
-## Notes
-
-- Safari cookie access may require Full Disk Access.
-- Chromium imports can trigger a Keychain prompt for "Chrome Safe Storage".
-- To explain keychain prompts before they appear, set a preflight handler:
-
-```swift
-import SweetCookieKit
-
-BrowserCookieKeychainPromptHandler.handler = { context in
-    // Show a blocking alert or custom UI before the system prompt appears.
-    // context.kind = .chromiumSafeStorage
-}
-```
-
-- For background work that must not display Keychain UI, scope the import with
-  `withUserInteractionDisallowed`. SweetCookieKit tries every available Safe Storage
-  label without interaction, then returns `BrowserCookieError.accessDenied` if none
-  can be read without prompting:
+Background work can prohibit Keychain UI for one import:
 
 ```swift
 let records = try BrowserCookieKeychainAccessGate.withUserInteractionDisallowed {
-    try client.records(matching: query, in: store!)
+    try client.records(matching: query, in: store)
 }
 ```
 
-- This package does not persist cookies. It only reads and returns them.
+The [advanced usage guide](docs/advanced-usage.md) covers query matching, browser ordering, prompt preflighting, noninteractive imports, and Chromium local-storage helpers.
+
+## API and examples
+
+The package includes DocC documentation and a standalone example executable:
+
+| Resource | Purpose |
+| --- | --- |
+| [Advanced usage](docs/advanced-usage.md) | Queries, permissions, local storage, and LevelDB helpers |
+| [DocC catalog](Sources/SweetCookieKit/Documentation.docc/Documentation.md) | Public types and core concepts |
+| [SweetCookieCLI](Examples/CookieCLI/README.md) | List stores and export cookies as JSON, lines, or HTTP headers |
 
 ## Development
 
-```bash
-swiftformat Sources Tests
-swiftlint --strict
+```sh
+swift build
+swift test
+swift package --allow-writing-to-directory /tmp/SweetCookieKit-docc generate-documentation --target SweetCookieKit --disable-indexing --transform-for-static-hosting --output-path /tmp/SweetCookieKit-docc
 ```
 
 ## License
 
-See `LICENSE`.
+SweetCookieKit is available under the [MIT License](LICENSE).
