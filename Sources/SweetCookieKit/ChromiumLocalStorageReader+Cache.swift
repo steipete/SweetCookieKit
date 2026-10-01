@@ -17,6 +17,40 @@ extension ChromiumLocalStorageReader {
 final class LevelDBReadCache: @unchecked Sendable {
     private static let epoch = ContinuousClock.now
 
+    enum Derivation: Hashable {
+        case textDecode, tokenScan, localStorageKey, localStorageValue
+    }
+
+    struct OriginResult {
+        let entries: [ChromiumLocalStorageEntry]
+        let decodedKeys: Int
+    }
+
+    struct DerivedResults {
+        var text: [ChromiumLevelDBTextEntry]?
+        var tokens = Variants<Int, [String]>()
+        var origins = Variants<Data, OriginResult>()
+    }
+
+    struct Variants<Key: Hashable, Value> {
+        private var values: [Key: Value] = [:]
+        private var recency: [Key] = []
+
+        mutating func value(for key: Key, create: () -> Value) -> Value {
+            self.recency.removeAll { $0 == key }
+            self.recency.append(key)
+            if let cached = self.values[key] {
+                return cached
+            }
+            let value = create()
+            self.values[key] = value
+            if self.recency.count > 16 {
+                self.values.removeValue(forKey: self.recency.removeFirst())
+            }
+            return value
+        }
+    }
+
     private struct FileStamp: Equatable {
         let name: String
         let size: off_t
@@ -34,11 +68,13 @@ final class LevelDBReadCache: @unchecked Sendable {
         let entries: [ChromiumLocalStorageReader.LevelDBEntry]
         let diagnostics: [String]
         let created: TimeInterval
+        var derived: DerivedResults
     }
 
     private let lock = NSLock()
     private let clock: @Sendable () -> TimeInterval
     let readData: @Sendable (URL) throws -> Data
+    let onDerivation: (@Sendable (Derivation) -> Void)?
     private var memos: [String: Memo] = [:]
     private var recency: [String] = []
 
@@ -47,10 +83,12 @@ final class LevelDBReadCache: @unchecked Sendable {
             let elapsed = LevelDBReadCache.epoch.duration(to: .now).components
             return Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
         },
-        readData: @escaping @Sendable (URL) throws -> Data = { try Data(contentsOf: $0, options: [.mappedIfSafe]) })
+        readData: @escaping @Sendable (URL) throws -> Data = { try Data(contentsOf: $0, options: [.mappedIfSafe]) },
+        onDerivation: (@Sendable (Derivation) -> Void)? = nil)
     {
         self.clock = clock
         self.readData = readData
+        self.onDerivation = onDerivation
     }
 
     func invalidate() {
@@ -60,10 +98,11 @@ final class LevelDBReadCache: @unchecked Sendable {
         }
     }
 
-    func read(
+    func read<Value>(
         in directory: URL,
-        load: ([URL], inout Bool, (String) -> Void) -> [ChromiumLocalStorageReader.LevelDBEntry])
-        -> (entries: [ChromiumLocalStorageReader.LevelDBEntry]?, diagnostics: [String])
+        load: ([URL], inout Bool, (String) -> Void) -> [ChromiumLocalStorageReader.LevelDBEntry],
+        derive: ([ChromiumLocalStorageReader.LevelDBEntry], inout DerivedResults) -> Value)
+        -> (value: Value?, diagnostics: [String])
     {
         self.lock.withLock {
             let now = self.clock()
@@ -76,24 +115,29 @@ final class LevelDBReadCache: @unchecked Sendable {
                 return (nil, [])
             }
             let before = Self.snapshot(files)
-            if let before, let memo = self.memos[path], memo.snapshot == before {
+            if let before, var memo = self.memos[path], memo.snapshot == before {
                 self.recency.removeAll { $0 == path }
                 self.recency.append(path)
-                return (memo.entries, memo.diagnostics)
+                let value = derive(memo.entries, &memo.derived)
+                self.memos[path] = memo
+                return (value, memo.diagnostics)
             }
             self.memos.removeValue(forKey: path)
             self.recency.removeAll { $0 == path }
             var complete = true
             var diagnostics: [String] = []
             let entries = load(files, &complete) { diagnostics.append($0) }
+            var derived = DerivedResults()
+            let value = derive(entries, &derived)
             if complete, let before, let after = Self.files(in: directory).flatMap(Self.snapshot), before == after {
-                self.memos[path] = Memo(snapshot: before, entries: entries, diagnostics: diagnostics, created: now)
+                self.memos[path] = Memo(
+                    snapshot: before, entries: entries, diagnostics: diagnostics, created: now, derived: derived)
                 self.recency.append(path)
                 if self.recency.count > 8 {
                     self.memos.removeValue(forKey: self.recency.removeFirst())
                 }
             }
-            return (entries, diagnostics)
+            return (value, diagnostics)
         }
     }
 

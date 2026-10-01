@@ -11,16 +11,20 @@ extension ChromiumLocalStorageReader {
         let isDeletion: Bool
     }
 
-    static func levelDBEntries(
+    static func withLevelDBEntries<Value>(
         in levelDBURL: URL,
-        logger: ((String) -> Void)? = nil) -> [LevelDBEntry]?
+        logger: ((String) -> Void)? = nil,
+        derive: ([LevelDBEntry], inout LevelDBReadCache.DerivedResults) -> Value) -> Value?
     {
         let cache = self.levelDBCache
-        let result = cache.read(in: levelDBURL) { files, complete, log in
-            self.decodeFiles(files, cache: cache, complete: &complete, logger: log)
-        }
+        let result = cache.read(
+            in: levelDBURL,
+            load: { files, complete, log in
+                self.decodeFiles(files, cache: cache, complete: &complete, logger: log)
+            },
+            derive: derive)
         result.diagnostics.forEach { logger?($0) }
-        return result.entries
+        return result.value
     }
 
     private static func decodeFiles(

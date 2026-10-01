@@ -44,10 +44,65 @@ public enum ChromiumLocalStorageReader {
             logger?("[chromium-storage] \(message)")
         }
 
-        guard let entries = self.levelDBEntries(in: levelDBURL, logger: log) else {
-            return []
+        guard let result = self.withLevelDBEntries(in: levelDBURL, logger: log, derive: { entries, derived in
+            // String equality folds Unicode spellings, but the returned origin preserves the caller's bytes.
+            derived.origins.value(for: Data(normalizedOrigin.utf8)) {
+                self.decodeEntries(entries, for: normalizedOrigin)
+            }
+        }) else { return [] }
+
+        if result.decodedKeys == 0 {
+            log("No local storage keys decoded in \(levelDBURL.lastPathComponent)")
+        } else if result.entries.isEmpty {
+            log("No local storage values for origin \(normalizedOrigin)")
+        } else {
+            log("Local storage values for origin \(normalizedOrigin): \(result.entries.count)")
+        }
+        return result.entries
+    }
+
+    /// Convenience wrapper for scanning a LevelDB directory for readable key/value pairs.
+    /// Prefer `ChromiumLevelDBReader` for non-local-storage use cases.
+    public static func readTextEntries(
+        in levelDBURL: URL,
+        logger: ((String) -> Void)? = nil) -> [ChromiumLevelDBTextEntry]
+    {
+        let log: (String) -> Void = { message in
+            logger?("[chromium-storage] \(message)")
         }
 
+        return self.withLevelDBEntries(in: levelDBURL, logger: log) { entries, derived in
+            if let cached = derived.text {
+                return cached
+            }
+            let result = self.decodeTextEntries(entries)
+            derived.text = result
+            return result
+        } ?? []
+    }
+
+    /// Convenience wrapper for token candidate scanning across LevelDB entries.
+    /// Prefer `ChromiumLevelDBReader` when you do not need local storage decoding.
+    public static func readTokenCandidates(
+        in levelDBURL: URL,
+        minimumLength: Int = 60,
+        logger: ((String) -> Void)? = nil) -> [String]
+    {
+        let log: (String) -> Void = { message in
+            logger?("[chromium-storage] \(message)")
+        }
+
+        return self.withLevelDBEntries(in: levelDBURL, logger: log) { entries, derived in
+            derived.tokens.value(for: minimumLength) {
+                self.scanTokenCandidates(entries, minimumLength: minimumLength)
+            }
+        } ?? []
+    }
+
+    private static func decodeEntries(
+        _ entries: [LevelDBEntry],
+        for normalizedOrigin: String) -> LevelDBReadCache.OriginResult
+    {
         var values: [String: String] = [:]
         var rawLengths: [String: Int] = [:]
         var tombstones = Set<String>()
@@ -73,37 +128,17 @@ public enum ChromiumLocalStorageReader {
             rawLengths[storageKey] = entry.value.count
         }
 
-        if decodedKeys == 0 {
-            log("No local storage keys decoded in \(levelDBURL.lastPathComponent)")
-        } else if values.isEmpty {
-            log("No local storage values for origin \(normalizedOrigin)")
-        } else {
-            log("Local storage values for origin \(normalizedOrigin): \(values.count)")
-        }
-
-        return values.map {
+        let results = values.map {
             ChromiumLocalStorageEntry(
                 origin: normalizedOrigin,
                 key: $0.key,
                 value: $0.value,
                 rawValueLength: rawLengths[$0.key] ?? $0.value.utf8.count)
         }
+        return LevelDBReadCache.OriginResult(entries: results, decodedKeys: decodedKeys)
     }
 
-    /// Convenience wrapper for scanning a LevelDB directory for readable key/value pairs.
-    /// Prefer `ChromiumLevelDBReader` for non-local-storage use cases.
-    public static func readTextEntries(
-        in levelDBURL: URL,
-        logger: ((String) -> Void)? = nil) -> [ChromiumLevelDBTextEntry]
-    {
-        let log: (String) -> Void = { message in
-            logger?("[chromium-storage] \(message)")
-        }
-
-        guard let entries = self.levelDBEntries(in: levelDBURL, logger: log) else {
-            return []
-        }
-
+    private static func decodeTextEntries(_ entries: [LevelDBEntry]) -> [ChromiumLevelDBTextEntry] {
         var results: [ChromiumLevelDBTextEntry] = []
         results.reserveCapacity(entries.count)
         for entry in entries {
@@ -118,21 +153,7 @@ public enum ChromiumLocalStorageReader {
         return results
     }
 
-    /// Convenience wrapper for token candidate scanning across LevelDB entries.
-    /// Prefer `ChromiumLevelDBReader` when you do not need local storage decoding.
-    public static func readTokenCandidates(
-        in levelDBURL: URL,
-        minimumLength: Int = 60,
-        logger: ((String) -> Void)? = nil) -> [String]
-    {
-        let log: (String) -> Void = { message in
-            logger?("[chromium-storage] \(message)")
-        }
-
-        guard let entries = self.levelDBEntries(in: levelDBURL, logger: log) else {
-            return []
-        }
-
+    private static func scanTokenCandidates(_ entries: [LevelDBEntry], minimumLength: Int) -> [String] {
         var tokens = Set<String>()
         for entry in entries {
             tokens.formUnion(self.scanTokens(in: entry.key, minimumLength: minimumLength))
@@ -149,6 +170,7 @@ public enum ChromiumLocalStorageReader {
     }
 
     private static func decodeLocalStorageKey(_ data: Data) -> LocalStorageKey? {
+        self.levelDBCache.onDerivation?(.localStorageKey)
         if let decoded = self.decodeLocalStorageKey(data, startIndex: 1, requiresPrefix: true) {
             return decoded
         }
@@ -185,19 +207,29 @@ public enum ChromiumLocalStorageReader {
 
     private static func looksLikeOrigin(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return false }
-        if trimmed.contains("://") { return true }
-        if trimmed == "localhost" || trimmed.hasPrefix("localhost:") { return true }
+        if trimmed.isEmpty {
+            return false
+        }
+        if trimmed.contains("://") {
+            return true
+        }
+        if trimmed == "localhost" || trimmed.hasPrefix("localhost:") {
+            return true
+        }
         return trimmed.contains(".")
     }
 
     private static func decodeLocalStorageValue(_ data: Data) -> String? {
+        self.levelDBCache.onDerivation?(.localStorageValue)
         guard !data.isEmpty else { return nil }
         return self.decodePrefixedString(data) ?? self.decodeText(data)
     }
 
     private static func decodeText(_ data: Data) -> String? {
-        if data.isEmpty { return nil }
+        self.levelDBCache.onDerivation?(.textDecode)
+        if data.isEmpty {
+            return nil
+        }
         if let decoded = self.decodePrefixedString(data) {
             return decoded.trimmingCharacters(in: .controlCharacters)
         }
@@ -291,14 +323,20 @@ public enum ChromiumLocalStorageReader {
     }
 
     private static func originMatches(_ storageKeyOrigin: String, _ requestedOrigin: String) -> Bool {
-        if storageKeyOrigin == requestedOrigin { return true }
+        if storageKeyOrigin == requestedOrigin {
+            return true
+        }
 
         let storageHost = self.originHost(from: storageKeyOrigin)
         let requestedHost = self.originHost(from: requestedOrigin)
-        if let storageHost, let requestedHost, storageHost == requestedHost { return true }
+        if let storageHost, let requestedHost, storageHost == requestedHost {
+            return true
+        }
 
         let requestedStripped = self.stripScheme(from: requestedOrigin)
-        if storageKeyOrigin == requestedStripped { return true }
+        if storageKeyOrigin == requestedStripped {
+            return true
+        }
         return false
     }
 
@@ -322,6 +360,7 @@ public enum ChromiumLocalStorageReader {
     }
 
     private static func scanTokens(in data: Data, minimumLength: Int) -> [String] {
+        self.levelDBCache.onDerivation?(.tokenScan)
         guard minimumLength > 0 else { return [] }
         var buffer: [UInt8] = []
         var results: [String] = []
