@@ -15,6 +15,8 @@ extension ChromiumLocalStorageReader {
 
 /// All mutable state and traversal I/O are protected by the lock. Callers replay diagnostics after unlocking.
 final class LevelDBReadCache: @unchecked Sendable {
+    private static let epoch = ContinuousClock.now
+
     private struct FileStamp: Equatable {
         let name: String
         let size: off_t
@@ -41,7 +43,10 @@ final class LevelDBReadCache: @unchecked Sendable {
     private var recency: [String] = []
 
     init(
-        clock: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        clock: @escaping @Sendable () -> TimeInterval = {
+            let elapsed = LevelDBReadCache.epoch.duration(to: .now).components
+            return Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
+        },
         readData: @escaping @Sendable (URL) throws -> Data = { try Data(contentsOf: $0, options: [.mappedIfSafe]) })
     {
         self.clock = clock

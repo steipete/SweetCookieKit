@@ -106,3 +106,5 @@ ChromiumLocalStorageReader.invalidateCache()
 ```
 
 Invalidation also covers calls through `ChromiumLevelDBReader`. Reads and invalidation are thread-safe; invalidation waits for any active traversal before clearing its memo. Arrays already returned to callers remain owned by those callers.
+
+The ten-minute reuse limit uses a continuous clock, so time spent asleep also counts toward expiry.
