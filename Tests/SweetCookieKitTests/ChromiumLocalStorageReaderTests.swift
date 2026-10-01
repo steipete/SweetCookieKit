@@ -4,7 +4,7 @@ import Testing
 
 struct ChromiumLocalStorageReaderTests {
     @Test
-    func readsHostOnlyStorageKeyWithoutPrefix() throws {
+    func `reads host only storage key without prefix`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(
             storageKey: "minimax.io",
@@ -23,7 +23,7 @@ struct ChromiumLocalStorageReaderTests {
     }
 
     @Test
-    func readsPrefixedStorageKey() throws {
+    func `reads prefixed storage key`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(storageKey: "https://example.com", key: "pref")
         let value = self.localStorageValue("value-0")
@@ -39,7 +39,7 @@ struct ChromiumLocalStorageReaderTests {
     }
 
     @Test
-    func readsPartitionedStorageKey() throws {
+    func `reads partitioned storage key`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(
             storageKey: "https://example.com/^0https://top.example",
@@ -57,7 +57,7 @@ struct ChromiumLocalStorageReaderTests {
     }
 
     @Test
-    func ignoresNonOriginKeysWithoutPrefix() throws {
+    func `ignores non origin keys without prefix`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(storageKey: "not-an-origin", key: "pref", includePrefix: false)
         let value = self.localStorageValue("value-ignored")
@@ -71,7 +71,7 @@ struct ChromiumLocalStorageReaderTests {
     }
 
     @Test
-    func prefersDeletionTombstoneFromLog() throws {
+    func `prefers deletion tombstone from log`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(storageKey: "https://example.com", key: "pref")
         let value = self.localStorageValue("value-2")
@@ -85,7 +85,7 @@ struct ChromiumLocalStorageReaderTests {
     }
 
     @Test
-    func readsTokenCandidatesFromLevelDB() throws {
+    func `reads token candidates from level DB`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let token = String(repeating: "a", count: 25) + "." + String(repeating: "b", count: 25) + ".ccc"
         let key = self.localStorageKey(storageKey: "https://example.com", key: "pref")
@@ -113,14 +113,14 @@ struct ChromiumLocalStorageReaderTests {
 }
 
 extension ChromiumLocalStorageReaderTests {
-    private func makeLevelDBDirectory() throws -> URL {
+    func makeLevelDBDirectory() throws -> URL {
         let root = FileManager.default.temporaryDirectory
         let url = root.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
 
-    private func localStorageKey(storageKey: String, key: String, includePrefix: Bool = true) -> Data {
+    func localStorageKey(storageKey: String, key: String, includePrefix: Bool = true) -> Data {
         var data = Data()
         if includePrefix {
             data.append(0x5F)
@@ -131,13 +131,13 @@ extension ChromiumLocalStorageReaderTests {
         return data
     }
 
-    private func localStorageValue(_ value: String) -> Data {
+    func localStorageValue(_ value: String) -> Data {
         var data = Data([0x01])
         data.append(contentsOf: value.utf8)
         return data
     }
 
-    private func writeLog(entries: [(key: Data, value: Data, isDeletion: Bool)], to url: URL) throws {
+    func writeLog(entries: [(key: Data, value: Data, isDeletion: Bool)], to url: URL) throws {
         var batch = Data()
         batch.append(contentsOf: Array(repeating: 0, count: 8))
         let count = UInt32(entries.count)

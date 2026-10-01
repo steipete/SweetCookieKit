@@ -6,7 +6,7 @@ import Testing
 
 struct ChromiumLevelDBTableTests {
     @Test
-    func readsEntriesFromSnappyTable() throws {
+    func `reads entries from snappy table`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(storageKey: "https://example.com", key: "access_token")
         let value = self.localStorageValue("token-123")
@@ -27,7 +27,7 @@ struct ChromiumLevelDBTableTests {
     }
 
     @Test
-    func readsEntriesFromRawTable() throws {
+    func `reads entries from raw table`() throws {
         let levelDBURL = try self.makeLevelDBDirectory()
         let key = self.localStorageKey(storageKey: "https://example.com", key: "session")
         let value = self.localStorageValue("value-raw")
@@ -87,14 +87,14 @@ extension ChromiumLevelDBTableTests {
         return data
     }
 
-    private func levelDBInternalKey(userKey: Data, valueType: UInt8, sequence: UInt64) -> Data {
+    func levelDBInternalKey(userKey: Data, valueType: UInt8, sequence: UInt64) -> Data {
         var data = Data(userKey)
         let tag = (sequence << 8) | UInt64(valueType)
         data.append(contentsOf: self.littleEndianBytes(tag))
         return data
     }
 
-    private func writeTable(
+    func writeTable(
         entries: [(key: Data, value: Data)],
         to url: URL,
         useSnappy: Bool) throws

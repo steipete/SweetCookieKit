@@ -94,3 +94,15 @@ let tokens = ChromiumLevelDBReader.readTokenCandidates(
 ```
 
 These helpers read local storage; they do not modify or persist browser data.
+
+All three readers share an in-memory memo of decoded LevelDB entries, before origin or token filtering. The memo holds at most eight directories, evicts the least recently used directory, and reuses a result for at most ten minutes from its original read. Every lookup checks file names, sizes, nanosecond modification times, inode/device identity, and permission/change metadata. Changes to `CURRENT`, `MANIFEST-*`, `.log`, `.ldb`, or `.sst` files invalidate the memo; the readers continue to decode `.log` and `.ldb` files as before.
+
+Only complete reads with successful decoding and matching before/after file snapshots are memoized. Unreadable, missing, malformed, or concurrently changing files retain the usual best-effort results and diagnostics, without caching those results. Hits preserve traversal order and replay the same diagnostics. Directory metadata is still inspected on hits, but file contents are not read again.
+
+Cached values can contain session tokens and are never persisted or logged by the memo. Hosts can explicitly drop the shared memo on sign-out or whenever they want the next call to read files again:
+
+```swift
+ChromiumLocalStorageReader.invalidateCache()
+```
+
+Invalidation also covers calls through `ChromiumLevelDBReader`. Reads and invalidation are thread-safe; invalidation waits for any active traversal before clearing its memo. Arrays already returned to callers remain owned by those callers.

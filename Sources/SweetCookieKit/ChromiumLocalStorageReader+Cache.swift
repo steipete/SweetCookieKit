@@ -1,0 +1,125 @@
+import Foundation
+
+#if os(macOS)
+import Darwin
+
+extension ChromiumLocalStorageReader {
+    /// Task-local injection keeps synthetic clocks and I/O hooks isolated in parallel tests.
+    @TaskLocal static var levelDBCache = LevelDBReadCache()
+
+    /// Drops all memoized local-storage data, including data used by `ChromiumLevelDBReader`.
+    public static func invalidateCache() {
+        self.levelDBCache.invalidate()
+    }
+}
+
+/// All mutable state and traversal I/O are protected by the lock. Callers replay diagnostics after unlocking.
+final class LevelDBReadCache: @unchecked Sendable {
+    private struct FileStamp: Equatable {
+        let name: String
+        let size: off_t
+        let modifiedSeconds: Int
+        let modifiedNanoseconds: Int
+        let changedSeconds: Int
+        let changedNanoseconds: Int
+        let inode: ino_t
+        let device: dev_t
+        let mode: mode_t
+    }
+
+    private struct Memo {
+        let snapshot: [FileStamp]
+        let entries: [ChromiumLocalStorageReader.LevelDBEntry]
+        let diagnostics: [String]
+        let created: TimeInterval
+    }
+
+    private let lock = NSLock()
+    private let clock: @Sendable () -> TimeInterval
+    let readData: @Sendable (URL) throws -> Data
+    private var memos: [String: Memo] = [:]
+    private var recency: [String] = []
+
+    init(
+        clock: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        readData: @escaping @Sendable (URL) throws -> Data = { try Data(contentsOf: $0, options: [.mappedIfSafe]) })
+    {
+        self.clock = clock
+        self.readData = readData
+    }
+
+    func invalidate() {
+        self.lock.withLock {
+            self.memos.removeAll()
+            self.recency.removeAll()
+        }
+    }
+
+    func read(
+        in directory: URL,
+        load: ([URL], inout Bool, (String) -> Void) -> [ChromiumLocalStorageReader.LevelDBEntry])
+        -> (entries: [ChromiumLocalStorageReader.LevelDBEntry]?, diagnostics: [String])
+    {
+        self.lock.withLock {
+            let now = self.clock()
+            self.memos = self.memos.filter { now >= $0.value.created && now - $0.value.created < 600 }
+            self.recency.removeAll { self.memos[$0] == nil }
+            let path = directory.standardizedFileURL.path
+            guard let files = Self.files(in: directory) else {
+                self.memos.removeValue(forKey: path)
+                self.recency.removeAll { $0 == path }
+                return (nil, [])
+            }
+            let before = Self.snapshot(files)
+            if let before, let memo = self.memos[path], memo.snapshot == before {
+                self.recency.removeAll { $0 == path }
+                self.recency.append(path)
+                return (memo.entries, memo.diagnostics)
+            }
+            self.memos.removeValue(forKey: path)
+            self.recency.removeAll { $0 == path }
+            var complete = true
+            var diagnostics: [String] = []
+            let entries = load(files, &complete) { diagnostics.append($0) }
+            if complete, let before, let after = Self.files(in: directory).flatMap(Self.snapshot), before == after {
+                self.memos[path] = Memo(snapshot: before, entries: entries, diagnostics: diagnostics, created: now)
+                self.recency.append(path)
+                if self.recency.count > 8 {
+                    self.memos.removeValue(forKey: self.recency.removeFirst())
+                }
+            }
+            return (entries, diagnostics)
+        }
+    }
+
+    private static func files(in directory: URL) -> [URL]? {
+        try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles])
+    }
+
+    private static func snapshot(_ files: [URL]) -> [FileStamp]? {
+        var result: [FileStamp] = []
+        for file in files {
+            let name = file.lastPathComponent
+            guard name == "CURRENT" || name.hasPrefix("MANIFEST-") ||
+                ["log", "ldb", "sst"].contains(file.pathExtension.lowercased()) else { continue }
+            var info = stat()
+            guard stat(file.path, &info) == 0, access(file.path, R_OK) == 0 else { return nil }
+            result.append(FileStamp(
+                name: name,
+                size: info.st_size,
+                modifiedSeconds: info.st_mtimespec.tv_sec,
+                modifiedNanoseconds: info.st_mtimespec.tv_nsec,
+                changedSeconds: info.st_ctimespec.tv_sec,
+                changedNanoseconds: info.st_ctimespec.tv_nsec,
+                inode: info.st_ino,
+                device: info.st_dev,
+                mode: info.st_mode))
+        }
+        // Retain enumeration order too: equal-mtime files use that order during traversal.
+        return result
+    }
+}
+#endif

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Memoize complete Chromium local-storage reads in memory with file-change invalidation, bounded retention, and an explicit cache invalidation API.
+
 ## 0.5.3 — 2026-09-13
 
 **Highlights:** Safari, Firefox, and Zen imports now preserve domain-cookie scope.
