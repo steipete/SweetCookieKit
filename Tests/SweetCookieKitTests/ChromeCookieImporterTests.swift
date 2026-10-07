@@ -3,6 +3,7 @@ import CryptoKit
 import Foundation
 import LocalAuthentication
 import Security
+import SQLite3
 import Testing
 @testable import SweetCookieKit
 
@@ -10,6 +11,69 @@ import Testing
 
 @Suite(.serialized)
 struct ChromeCookieImporterTests {
+    @Test
+    func egoLitePublicClientDiscoversProfilesAndDecryptsCookies() throws {
+        ChromeCookieImporter.resetSafeStorageKeyCacheForTesting()
+        let wasDisabled = BrowserCookieKeychainAccessGate.isDisabled
+        BrowserCookieKeychainAccessGate.isDisabled = false
+        defer {
+            ChromeCookieImporter.resetSafeStorageKeyCacheForTesting()
+            BrowserCookieKeychainAccessGate.isDisabled = wasDisabled
+        }
+
+        let recorder = LabelRecorder()
+        // Seed the existing cache through the injected lookup; never access the user's Keychain.
+        let key = try ChromeCookieImporter.chromeSafeStorageKey(for: .egoLite) { service, account, allowInteraction in
+            recorder.record(service: service, account: account, allowInteraction: allowInteraction)
+            guard service == "ego safe storage", account == "ego", !allowInteraction else {
+                return (status: errSecItemNotFound, password: nil)
+            }
+            return (status: errSecSuccess, password: "synthetic-ego-password")
+        }
+        #expect(recorder.snapshot().map { "\($0.service)|\($0.account)|\($0.allowInteraction)" } == [
+            "ego safe storage|ego|false",
+            "ego safe storage|ego|false",
+        ])
+
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let root = home.appendingPathComponent("Library/Application Support/Citro Labs/ego lite")
+        let profiles = ["Default", "Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5"]
+        let hostKey = ".example.com"
+        let plaintext = Data(SHA256.hash(data: Data(hostKey.utf8))) + Data("synthetic-session".utf8)
+        let encrypted = Data("v10".utf8) + Self.encryptAES128CBCPKCS7(plaintext: plaintext, key: key)
+        for (index, profile) in profiles.enumerated() {
+            let relativePath = index.isMultiple(of: 2) ? "Cookies" : "Network/Cookies"
+            try Self.writeChromiumCookieDatabase(
+                at: root.appendingPathComponent(profile).appendingPathComponent(relativePath),
+                encryptedValue: encrypted)
+        }
+
+        let client = BrowserCookieClient(configuration: .init(homeDirectories: [home]))
+        let stores = client.stores(for: .egoLite)
+        #expect(stores.count == profiles.count)
+        #expect(Set(stores.map(\.profile.name)) == Set(profiles))
+        #expect(stores.allSatisfy { $0.browser == .egoLite })
+        #expect(stores.filter { $0.kind == .primary }.count == 3)
+        #expect(stores.filter { $0.kind == .network }.count == 3)
+        #expect(Browser.defaultImportOrder.contains(.egoLite))
+
+        try BrowserCookieKeychainAccessGate.withUserInteractionDisallowed {
+            for store in stores {
+                let records = try client.records(
+                    matching: .init(domains: ["example.com"], domainMatch: .suffix), in: store)
+                #expect(records.count == 1)
+                let record = try #require(records.first)
+                #expect(record.domain == "example.com")
+                #expect(record.scope == .domain)
+                #expect(record.name == "session")
+                #expect(record.value == "synthetic-session")
+                #expect(record.isSecure && record.isHTTPOnly)
+                #expect(try client.records(matching: .init(domains: ["other.example"]), in: store).isEmpty)
+            }
+        }
+    }
+
     @Test
     func `noninteractive safe storage query explicitly fails authentication UI`() {
         let query = ChromeCookieImporter.makeGenericPasswordQuery(
@@ -366,6 +430,24 @@ struct ChromeCookieImporterTests {
             "Chrome Safe Storage",
         ])
         #expect(recorder.snapshot().map(\.allowInteraction) == [false, false, true])
+    }
+
+    private static func writeChromiumCookieDatabase(at url: URL, encryptedValue: Data) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var database: OpaquePointer?
+        let result = sqlite3_open(url.path, &database)
+        defer { sqlite3_close(database) }
+        try #require(result == SQLITE_OK)
+        let encryptedHex = encryptedValue.map { String(format: "%02x", $0) }.joined()
+        let sql = """
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+        INSERT INTO meta VALUES ('version', '24');
+        CREATE TABLE cookies (
+            host_key TEXT, name TEXT, path TEXT, expires_utc INTEGER,
+            is_secure INTEGER, is_httponly INTEGER, value TEXT, encrypted_value BLOB);
+        INSERT INTO cookies VALUES ('.example.com', 'session', '/', 0, 1, 1, '', X'\(encryptedHex)');
+        """
+        try #require(sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK)
     }
 
     private static func encryptAES128CBCPKCS7(plaintext: Data, key: Data) -> Data {

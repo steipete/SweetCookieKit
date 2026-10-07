@@ -35,6 +35,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case aside
     case opera
     case operaNeon
+    case egoLite
 
     /// Display name for UI or logs.
     public var displayName: String {

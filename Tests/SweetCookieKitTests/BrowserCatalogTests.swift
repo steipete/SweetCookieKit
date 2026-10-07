@@ -102,6 +102,17 @@ struct BrowserCatalogTests {
         #expect(labels.contains("ChatGPT Atlas Safe Storage|ChatGPT Atlas"))
         #expect(labels.contains("Yandex Safe Storage|Yandex"))
         #expect(labels.contains("Comet Safe Storage|Comet"))
+        #expect(labels.contains("ego safe storage|ego"))
+    }
+
+    @Test
+    func `ego lite metadata points at Chromium profile and safe storage`() {
+        #expect(Browser.egoLite.displayName == "Ego Lite")
+        #expect(Browser.egoLite.appBundleName == "ego lite")
+        #expect(Browser.egoLite.chromiumProfileRelativePath == "Citro Labs/ego lite")
+        #expect(Browser.egoLite.usesChromiumProfileStore)
+        let labels = Browser.egoLite.safeStorageLabels.map { "\($0.service)|\($0.account)" }
+        #expect(labels == ["ego safe storage|ego"])
     }
 
     @Test

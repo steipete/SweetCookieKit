@@ -45,6 +45,8 @@ print("Loaded \(cookies.count) cookies from \(store.profile.name)")
 
 Chromium sources include Aside (`Aside`), Opera (`com.operasoftware.Opera`), and Opera Neon (`com.operasoftware.OperaNeon`) under `~/Library/Application Support`. Aside uses the `Aside Safe Storage` / `Aside` Keychain label; both Opera variants use `Opera Safe Storage` / `Opera`. Discovery reuses the standard `Default` and `Profile N` layout. Hosts can retain Chrome-only policies by passing `[.chrome]`.
 
+Ego Lite (`.egoLite`, app bundle `ego lite.app`) uses `~/Library/Application Support/Citro Labs/ego lite` and the `ego safe storage` / `ego` Keychain label. Its profiles use the shared Chromium discovery and cookie decryption path.
+
 ```swift
 let stores = client.stores(in: [.safari, .chrome, .firefox])
 for store in stores {

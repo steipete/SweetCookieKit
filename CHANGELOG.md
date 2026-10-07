@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add Ego Lite browser discovery and encrypted-cookie imports through the shared Chromium reader. (#23, thanks @apple-ouyang)
+
 ## 0.5.5 — 2026-10-03
 
 **Highlights:** Aside, Opera, and Opera Neon are discovered as Chromium cookie sources.

@@ -24,6 +24,11 @@ struct ChromiumProfileLocatorTests {
     }
 
     @Test
+    func chromiumRelativePath_mapsEgoLite() {
+        #expect(ChromiumProfileLocator.chromiumRelativePath(for: .egoLite) == "Citro Labs/ego lite")
+    }
+
+    @Test
     func roots_dedupesHomesAndBuildsExpectedPaths() {
         let home = URL(fileURLWithPath: "/Users/test")
         let roots = ChromiumProfileLocator.roots(

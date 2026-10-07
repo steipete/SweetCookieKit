@@ -301,6 +301,15 @@ enum BrowserCatalog {
                 chromiumProfileRelativePath: "com.operasoftware.OperaNeon",
                 geckoProfilesFolder: nil,
                 safeStorageLabels: [("Opera Safe Storage", "Opera")]),
+            BrowserMetadata(
+                browser: .egoLite,
+                displayName: "Ego Lite",
+                engine: .chromium,
+                defaultImportOrderRank: 28,
+                chromiumProfileRelativePath: "Citro Labs/ego lite",
+                geckoProfilesFolder: nil,
+                safeStorageLabels: [("ego safe storage", "ego")],
+                appBundleName: "ego lite"),
         ]
 
         var map: [Browser: BrowserMetadata] = [:]
@@ -344,6 +353,7 @@ enum BrowserCatalog {
             .aside,
             .opera,
             .operaNeon,
+            .egoLite,
         ]
         return labelOrder.flatMap { metadata(for: $0).safeStorageLabels }
     }()
