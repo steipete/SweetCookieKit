@@ -3,6 +3,7 @@ import Testing
 @testable import SweetCookieKit
 
 #if os(macOS)
+import Darwin
 
 struct ChromiumLevelDBCurrentRecordTests {
     @Test
@@ -224,8 +225,16 @@ struct SyntheticLevelDB {
     let key = Data("_https://example.com\0".utf8) + Data([1]) + Data("access_token".utf8)
 
     init() throws {
-        self.directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: self.directory, withIntermediateDirectories: true)
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
+        // Canonicalize only this generated root, never the symlinks created by individual tests.
+        guard let physical = realpath(temporary.path, nil) else {
+            let error = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        }
+        defer { free(physical) }
+        self.directory = URL(fileURLWithPath: String(cString: physical), isDirectory: true)
     }
 
     func remove() {

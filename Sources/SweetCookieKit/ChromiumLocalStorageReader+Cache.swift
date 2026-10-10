@@ -73,12 +73,14 @@ final class LevelDBReadCache: @unchecked Sendable {
 
     private let lock = NSLock()
     private let clock: @Sendable () -> TimeInterval
+    let strictReads: Bool
     let readData: @Sendable (URL) throws -> Data
     let onDerivation: (@Sendable (Derivation) -> Void)?
     private var memos: [String: Memo] = [:]
     private var recency: [String] = []
 
     init(
+        strictReads: Bool = false,
         clock: @escaping @Sendable () -> TimeInterval = {
             let elapsed = LevelDBReadCache.epoch.duration(to: .now).components
             return Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
@@ -86,6 +88,7 @@ final class LevelDBReadCache: @unchecked Sendable {
         readData: @escaping @Sendable (URL) throws -> Data = { try Data(contentsOf: $0, options: [.mappedIfSafe]) },
         onDerivation: (@Sendable (Derivation) -> Void)? = nil)
     {
+        self.strictReads = strictReads
         self.clock = clock
         self.readData = readData
         self.onDerivation = onDerivation

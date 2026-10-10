@@ -53,6 +53,14 @@ extension ChromiumLocalStorageReader {
             foundTables.insert(number)
             return true
         }
+        if cache.strictReads {
+            let requiredLogs = Set([logNumber, version.previousLogNumber].filter { $0 > 0 })
+            let foundLogs = Set(selected.filter { $0.pathExtension.lowercased() == "log" }
+                .compactMap { UInt64($0.deletingPathExtension().lastPathComponent) })
+            if !requiredLogs.isSubset(of: foundLogs) {
+                complete = false
+            }
+        }
         if foundTables != liveTables {
             complete = false
             logger("LevelDB manifest references missing tables")
