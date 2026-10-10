@@ -105,7 +105,7 @@ public enum ChromiumLocalStorageReader {
     {
         var values: [String: String] = [:]
         var rawLengths: [String: Int] = [:]
-        var tombstones = Set<String>()
+        var seen = Set<String>()
         var decodedKeys = 0
         for entry in entries {
             guard let localKey = self.decodeLocalStorageKey(entry.key) else { continue }
@@ -114,15 +114,8 @@ public enum ChromiumLocalStorageReader {
             guard self.originMatches(entryOrigin, normalizedOrigin) else { continue }
             let storageKey = localKey.key
 
-            if entry.isDeletion {
-                tombstones.insert(storageKey)
-                values.removeValue(forKey: storageKey)
-                continue
-            }
-
-            guard !tombstones.contains(storageKey) else { continue }
-            // Keep the first seen value per key; LevelDB logs are already newest-first.
-            guard values[storageKey] == nil else { continue }
+            // Raw entries are current per user key and ordered by descending sequence.
+            guard seen.insert(storageKey).inserted, !entry.isDeletion else { continue }
             guard let decoded = self.decodeLocalStorageValue(entry.value) else { continue }
             values[storageKey] = decoded
             rawLengths[storageKey] = entry.value.count
@@ -142,6 +135,7 @@ public enum ChromiumLocalStorageReader {
         var results: [ChromiumLevelDBTextEntry] = []
         results.reserveCapacity(entries.count)
         for entry in entries {
+            guard !entry.isDeletion else { continue }
             guard let key = self.decodeText(entry.key) else { continue }
             let decoded = self.decodeText(entry.value)
             let stripped = self.decodeLocalStorageValue(entry.value)
@@ -156,6 +150,7 @@ public enum ChromiumLocalStorageReader {
     private static func scanTokenCandidates(_ entries: [LevelDBEntry], minimumLength: Int) -> [String] {
         var tokens = Set<String>()
         for entry in entries {
+            guard !entry.isDeletion else { continue }
             tokens.formUnion(self.scanTokens(in: entry.key, minimumLength: minimumLength))
             tokens.formUnion(self.scanTokens(in: entry.value, minimumLength: minimumLength))
         }
