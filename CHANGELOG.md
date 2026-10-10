@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix Chromium local-storage current-record selection using LevelDB sequences and live manifest files, preserving sign-in values after older deletions and excluding stale tokens from text and token scans. (steipete/CodexBar#3536)
 - Add Ego Lite browser discovery and encrypted-cookie imports through the shared Chromium reader. (#23, thanks @apple-ouyang)
 
 ## 0.5.5 — 2026-10-03

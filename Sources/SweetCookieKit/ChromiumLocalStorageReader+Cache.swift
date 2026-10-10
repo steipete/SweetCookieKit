@@ -167,8 +167,7 @@ final class LevelDBReadCache: @unchecked Sendable {
                 device: info.st_dev,
                 mode: info.st_mode))
         }
-        // Retain enumeration order too: equal-mtime files use that order during traversal.
-        return result
+        return result.sorted { $0.name < $1.name }
     }
 }
 #endif

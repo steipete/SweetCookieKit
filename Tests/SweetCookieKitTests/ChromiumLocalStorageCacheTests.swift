@@ -218,13 +218,13 @@ struct ChromiumLocalStorageCacheTests {
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
             try handle.close()
-            #expect(fixture.read().count == first.count * 2)
+            #expect(fixture.read().map(\.value) == first.map(\.value))
             #expect(fixture.io.reads == 2)
             let oldDate = try fixture.log.resourceValues(forKeys: [.contentModificationDateKey])
                 .contentModificationDate!
             try (data + data).write(to: fixture.log, options: .atomic)
             try FileManager.default.setAttributes([.modificationDate: oldDate], ofItemAtPath: fixture.log.path)
-            #expect(fixture.read().count == first.count * 2)
+            #expect(fixture.read().map(\.value) == first.map(\.value))
             #expect(fixture.io.reads == 3)
             _ = fixture.read()
             #expect(fixture.io.reads == 3)
@@ -235,13 +235,20 @@ struct ChromiumLocalStorageCacheTests {
     func `adding changing and removing files invalidate`(name: String) throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
+        if name == "CURRENT" {
+            let synthetic = try SyntheticLevelDB()
+            defer { synthetic.remove() }
+            try synthetic.version(log: 3).write(to: fixture.directory.appendingPathComponent("MANIFEST-000001"))
+        }
         try ChromiumLocalStorageReader.$levelDBCache.withValue(fixture.cache) {
             _ = fixture.read()
             let url = fixture.directory.appendingPathComponent(name)
             let table = ChromiumLevelDBTableTests()
-            if name.hasSuffix("ldb") {
+            if name.hasSuffix("ldb") || name.hasSuffix("sst") {
                 try table.writeTable(entries: [], to: fixture.directory, useSnappy: false)
                 try FileManager.default.moveItem(at: fixture.directory.appendingPathComponent("000005.ldb"), to: url)
+            } else if name == "CURRENT" {
+                try Data("MANIFEST-000001\n".utf8).write(to: url)
             } else {
                 try Data().write(to: url)
             }
