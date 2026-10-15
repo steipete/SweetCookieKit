@@ -129,7 +129,10 @@ enum GeckoCookieImporter {
         browser: Browser) throws -> [CookieRecord]
     {
         var db: OpaquePointer?
-        if sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) != SQLITE_OK {
+        // `path` is always the disposable temp copy. A cleanly closed profile leaves a WAL-mode database
+        // without -wal/-shm sidecars, which a read-only connection cannot recreate (SQLITE_CANTOPEN on
+        // prepare). Read-write lets SQLite create them inside the temp directory; browser files stay untouched.
+        if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, nil) != SQLITE_OK {
             throw ImportError.sqliteFailed(message: String(cString: sqlite3_errmsg(db)), browser: browser)
         }
         defer { sqlite3_close(db) }

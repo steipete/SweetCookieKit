@@ -203,6 +203,38 @@ struct BrowserCookieClientTests {
     }
 
     @Test
+    func `gecko import reads idle WAL profiles without sidecars`() throws {
+        let home = try Self.makeTemporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let profiles = home.appendingPathComponent("Library/Application Support/Firefox/Profiles")
+        let active = profiles.appendingPathComponent("active.default-release")
+        let idle = profiles.appendingPathComponent("idle.Profile 1")
+        for directory in [active, idle] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        try Self.writeGeckoCookies(active.appendingPathComponent("cookies.sqlite"))
+        // Firefox's bundled SQLite deletes -wal/-shm when it closes a profile cleanly, leaving a WAL-mode
+        // header with no sidecars. Apple's SQLite persists them on close, so remove them after the checkpoint.
+        let idleDatabase = idle.appendingPathComponent("cookies.sqlite")
+        try Self.writeGeckoCookies(idleDatabase, journalMode: "WAL")
+        for suffix in ["-wal", "-shm"] {
+            try? FileManager.default.removeItem(atPath: idleDatabase.path + suffix)
+        }
+
+        let client = BrowserCookieClient(configuration: .init(homeDirectories: [home]))
+        let sources = try client.records(
+            matching: .init(domains: ["example.com"], domainMatch: .suffix),
+            in: .firefox)
+
+        #expect(Set(sources.map(\.store.profile.name)) == ["active.default-release", "idle.Profile 1"])
+        for source in sources {
+            #expect(source.records.count == 4)
+        }
+        let idleContents = try FileManager.default.contentsOfDirectory(atPath: idle.path)
+        #expect(idleContents == ["cookies.sqlite"])
+    }
+
+    @Test
     func `safari stores falls back when no cookie files exist`() throws {
         let home = try Self.makeTemporaryHome()
         defer { try? FileManager.default.removeItem(at: home) }
@@ -332,12 +364,13 @@ struct BrowserCookieClientTests {
             encoding: .utf8)
     }
 
-    private static func writeGeckoCookies(_ url: URL) throws {
+    private static func writeGeckoCookies(_ url: URL, journalMode: String = "DELETE") throws {
         var database: OpaquePointer?
         let result = sqlite3_open(url.path, &database)
         defer { sqlite3_close(database) }
         try #require(result == SQLITE_OK)
         let sql = """
+        PRAGMA journal_mode=\(journalMode);
         CREATE TABLE moz_cookies (host TEXT, name TEXT, path TEXT, value TEXT, expiry INTEGER,
                                  isSecure INTEGER, isHttpOnly INTEGER);
         INSERT INTO moz_cookies VALUES ('.example.com', 'domain', '/', 'synthetic', 0, 1, 1);

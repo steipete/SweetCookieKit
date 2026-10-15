@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix Firefox and other Gecko cookie imports failing with "unable to open database file" when any profile holds a cleanly closed WAL-mode `cookies.sqlite` without `-wal`/`-shm` sidecars, which also discarded cookies from every healthy profile. (#33)
+
 ## 0.5.8 — 2026-10-15
 
 **Highlights:** The Claude desktop app is available as an opt-in Chromium cookie source, kept out of the default browser import order.
