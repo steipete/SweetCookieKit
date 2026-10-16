@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix Firefox and other Gecko cookie imports failing with "unable to open database file" when any profile holds a cleanly closed WAL-mode `cookies.sqlite` without `-wal`/`-shm` sidecars, which also discarded cookies from every healthy profile. (#33)
+- Fix Firefox and other Gecko cookie imports failing when an idle WAL-mode profile has no sidecars, while preserving active WAL cookies and leaving browser files unchanged. (#33, #34, thanks @pranshug2704)
 
 ## 0.5.8 — 2026-10-15
 
