@@ -49,7 +49,7 @@ for browser in Browser.defaultImportOrder {
 
 The result stays grouped by profile and store. Use `client.stores(in:)` when an interface needs to list all available sources before reading them.
 
-Firefox and other Gecko cookie imports read temporary copies of the database and any WAL sidecars. Both active profiles with uncheckpointed cookies and idle WAL-mode profiles without sidecars are supported; the browser's original files remain unchanged.
+Chromium and Gecko cookie imports read temporary copies of the database and any WAL sidecars. Both active profiles with uncheckpointed cookies and idle WAL-mode profiles without sidecars are supported; the browser's original files remain unchanged.
 
 ## Explain Keychain prompts
 

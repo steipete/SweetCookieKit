@@ -11,6 +11,59 @@ import Testing
 
 @Suite(.serialized)
 struct ChromeCookieImporterTests {
+    @Test(arguments: [false, true])
+    func `chromium import reads WAL snapshots without changing source files`(activeWAL: Bool) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let databaseURL = directory.appendingPathComponent("Cookies")
+        try Self.writeChromiumCookieDatabase(
+            at: databaseURL, value: "synthetic-plaintext", encryptedValue: Data())
+        var database: OpaquePointer?
+        try #require(sqlite3_open(databaseURL.path, &database) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        let sql = """
+        PRAGMA journal_mode=WAL;
+        PRAGMA wal_autocheckpoint=0;
+        UPDATE cookies SET value='synthetic-wal';
+        """
+        try #require(sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK)
+        if !activeWAL {
+            try #require(sqlite3_wal_checkpoint_v2(database, nil, SQLITE_CHECKPOINT_TRUNCATE, nil, nil) == SQLITE_OK)
+            try #require(sqlite3_close(database) == SQLITE_OK)
+            database = nil
+            for suffix in ["-wal", "-shm"] {
+                let sidecar = databaseURL.path + suffix
+                if FileManager.default.fileExists(atPath: sidecar) {
+                    try FileManager.default.removeItem(atPath: sidecar)
+                }
+            }
+        }
+        let originalDatabase = try Data(contentsOf: databaseURL)
+        let walURL = URL(fileURLWithPath: databaseURL.path + "-wal")
+        let originalWAL = activeWAL ? try Data(contentsOf: walURL) : nil
+        if let originalWAL {
+            try #require(originalWAL.count > 32)
+        }
+        let originalFiles = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        var keyRequests = 0
+        let records = try ChromeCookieImporter.loadCookies(
+            from: Self.cookieStore(at: databaseURL),
+            matchingDomains: ["example.com"],
+            domainMatch: .suffix,
+            safeStorageKey: { _ in
+                keyRequests += 1
+                return Data()
+            })
+
+        #expect(records.map(\.value) == ["synthetic-wal"])
+        #expect(keyRequests == 0)
+        #expect(try Data(contentsOf: databaseURL) == originalDatabase)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted() == originalFiles.sorted())
+        if let originalWAL {
+            #expect(try Data(contentsOf: walURL) == originalWAL)
+        }
+    }
+
     @Test(arguments: [BrowserCookieDomainMatch.contains, .suffix, .exact])
     func `unrelated hosts do not request safe storage key`(domainMatch: BrowserCookieDomainMatch) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

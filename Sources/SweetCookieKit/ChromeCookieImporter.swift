@@ -124,7 +124,8 @@ enum ChromeCookieImporter {
         domainMatch: BrowserCookieDomainMatch) throws -> [CookieRecord]
     {
         var db: OpaquePointer?
-        if sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) != SQLITE_OK {
+        // Only the disposable copy is writable, so SQLite can recreate missing WAL sidecars.
+        if sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, nil) != SQLITE_OK {
             throw ImportError.sqliteFailed(message: String(cString: sqlite3_errmsg(db)))
         }
         defer { sqlite3_close(db) }
