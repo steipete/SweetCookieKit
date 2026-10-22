@@ -151,6 +151,68 @@ struct BrowserCatalogTests {
         #expect(yandexLabels.contains("Yandex Safe Storage|Yandex"))
         #expect(Browser.safari.safeStorageLabels.isEmpty)
     }
+
+    @Test
+    func `chrome dev joins the chrome channel group after the principal browsers`() throws {
+        #expect(Browser.chromeDev.displayName == "Chrome Dev")
+        #expect(Browser.chromeDev.appBundleName == "Google Chrome Dev")
+        #expect(Browser.chromeDev.chromiumProfileRelativePath == "Google/Chrome Dev")
+        #expect(Browser.chromeDev.usesChromiumProfileStore)
+        let labels = Browser.chromeDev.safeStorageLabels.map { "\($0.service)|\($0.account)" }
+        #expect(labels == ["Chrome Safe Storage|Chrome"])
+
+        let order = Browser.defaultImportOrder
+        let devIndex = try #require(order.firstIndex(of: .chromeDev))
+        let canaryIndex = try #require(order.firstIndex(of: .chromeCanary))
+        let betaIndex = try #require(order.firstIndex(of: .chromeBeta))
+        let edgeIndex = try #require(order.firstIndex(of: .edge))
+        // Chrome Dev sits with the other Chrome channels, after the principal browsers.
+        #expect(betaIndex < canaryIndex && canaryIndex + 1 == devIndex)
+        #expect(edgeIndex < betaIndex)
+    }
+
+    @Test
+    func `chrome dev discovers synthetic chromium profile stores`() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let root = try #require(
+            ChromiumProfileLocator.roots(for: [.chromeDev], homeDirectories: [home]).first)
+        #expect(root.url == home.appendingPathComponent("Library/Application Support/Google/Chrome Dev"))
+        for profile in ["Default", "Profile 1"] {
+            let directory = root.url.appendingPathComponent(profile)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data().write(to: directory.appendingPathComponent("Cookies"))
+        }
+        let stores = BrowserCookieClient(configuration: .init(homeDirectories: [home])).stores(for: .chromeDev)
+        #expect(Set(stores.map(\.profile.name)) == Set(["Default", "Profile 1"]))
+        #expect(stores.allSatisfy { $0.browser == .chromeDev })
+    }
+
+    @Test
+    func `explicit browser selection by rawValue is retained after chrome dev upgrade`() throws {
+        // Simulate a downstream consumer (e.g., CodexBar) that stored an explicit
+        // browser selection as a rawValue string before Chrome Dev existed.
+        let storedBrowserID = "chrome"
+
+        // After upgrading to a version with Chrome Dev, filtering the default order
+        // by the stored rawValue should still yield only Chrome.
+        let order = Browser.defaultImportOrder
+        let filtered = order.filter { $0.rawValue == storedBrowserID }
+        #expect(filtered == [.chrome])
+        #expect(!filtered.contains(.chromeDev))
+
+        // Chrome Dev should be present in the unfiltered order (proving it was added).
+        #expect(order.contains(.chromeDev))
+
+        // And grouped with other Chrome channels after the principal browsers.
+        let chromeIndex = try #require(order.firstIndex(of: .chrome))
+        let betaIndex = try #require(order.firstIndex(of: .chromeBeta))
+        let canaryIndex = try #require(order.firstIndex(of: .chromeCanary))
+        let devIndex = try #require(order.firstIndex(of: .chromeDev))
+        #expect(chromeIndex < betaIndex)
+        #expect(betaIndex < canaryIndex)
+        #expect(canaryIndex < devIndex)
+    }
 }
 
 #endif
