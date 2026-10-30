@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.5.11 — 2026-10-30
+
+**Highlights:** Brave Origin is supported as a Chromium cookie source.
 
 - Add Brave Origin as a Chromium cookie source, reading `BraveSoftware/Brave-Origin` with Brave's Safe Storage Keychain item (#47). Thanks @retX0!
 
