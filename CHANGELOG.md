@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.5.11 — 2026-10-30
 
 **Highlights:** Brave Origin is supported as a Chromium cookie source.
