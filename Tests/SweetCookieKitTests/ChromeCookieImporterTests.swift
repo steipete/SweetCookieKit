@@ -188,8 +188,8 @@ struct ChromeCookieImporterTests {
         }
     }
 
-    @Test
-    func `ego lite public client discovers profiles and decrypts cookies`() throws {
+    @Test(arguments: [Browser.egoLite, .braveOrigin])
+    func `additional Chromium clients discover profiles and decrypt cookies`(browser: Browser) throws {
         ChromeCookieImporter.resetSafeStorageKeyCacheForTesting()
         let wasDisabled = BrowserCookieKeychainAccessGate.isDisabled
         BrowserCookieKeychainAccessGate.isDisabled = false
@@ -199,22 +199,25 @@ struct ChromeCookieImporterTests {
         }
 
         let recorder = LabelRecorder()
+        let service = browser == .egoLite ? "ego safe storage" : "Brave Safe Storage"
+        let account = browser == .egoLite ? "ego" : "Brave"
         // Seed the existing cache through the injected lookup; never access the user's Keychain.
-        let key = try ChromeCookieImporter.chromeSafeStorageKey(for: .egoLite) { service, account, allowInteraction in
-            recorder.record(service: service, account: account, allowInteraction: allowInteraction)
-            guard service == "ego safe storage", account == "ego", !allowInteraction else {
+        let key = try ChromeCookieImporter.chromeSafeStorageKey(for: browser) { label, user, allowInteraction in
+            recorder.record(service: label, account: user, allowInteraction: allowInteraction)
+            guard label == service, user == account, !allowInteraction else {
                 return (status: errSecItemNotFound, password: nil)
             }
-            return (status: errSecSuccess, password: "synthetic-ego-password")
+            return (status: errSecSuccess, password: "synthetic-browser-password")
         }
         #expect(recorder.snapshot().map { "\($0.service)|\($0.account)|\($0.allowInteraction)" } == [
-            "ego safe storage|ego|false",
-            "ego safe storage|ego|false",
+            "\(service)|\(account)|false",
+            "\(service)|\(account)|false",
         ])
 
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: home) }
-        let root = home.appendingPathComponent("Library/Application Support/Citro Labs/ego lite")
+        let path = try #require(browser.chromiumProfileRelativePath)
+        let root = home.appendingPathComponent("Library/Application Support/\(path)")
         let profiles = ["Default", "Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5"]
         let hostKey = ".example.com"
         let plaintext = Data(SHA256.hash(data: Data(hostKey.utf8))) + Data("synthetic-session".utf8)
@@ -227,13 +230,13 @@ struct ChromeCookieImporterTests {
         }
 
         let client = BrowserCookieClient(configuration: .init(homeDirectories: [home]))
-        let stores = client.stores(for: .egoLite)
+        let stores = client.stores(for: browser)
         #expect(stores.count == profiles.count)
         #expect(Set(stores.map(\.profile.name)) == Set(profiles))
-        #expect(stores.allSatisfy { $0.browser == .egoLite })
+        #expect(stores.allSatisfy { $0.browser == browser })
         #expect(stores.filter { $0.kind == .primary }.count == 3)
         #expect(stores.filter { $0.kind == .network }.count == 3)
-        #expect(Browser.defaultImportOrder.contains(.egoLite))
+        #expect(Browser.defaultImportOrder.contains(browser))
 
         try BrowserCookieKeychainAccessGate.withUserInteractionDisallowed {
             for store in stores {

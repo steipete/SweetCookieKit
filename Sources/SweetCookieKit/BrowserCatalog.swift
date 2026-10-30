@@ -319,6 +319,15 @@ enum BrowserCatalog {
                 geckoProfilesFolder: nil,
                 safeStorageLabels: [("Claude Safe Storage", "Claude Key")],
                 appBundleName: "Claude"),
+            BrowserMetadata(
+                browser: .braveOrigin,
+                displayName: "Brave Origin",
+                engine: .chromium,
+                defaultImportOrderRank: 30,
+                chromiumProfileRelativePath: "BraveSoftware/Brave-Origin",
+                geckoProfilesFolder: nil,
+                // Brave Origin reuses Brave's Safe Storage Keychain item.
+                safeStorageLabels: [("Brave Safe Storage", "Brave")]),
         ]
 
         var map: [Browser: BrowserMetadata] = [:]

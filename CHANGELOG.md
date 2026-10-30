@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add Brave Origin as a Chromium cookie source, reading `BraveSoftware/Brave-Origin` with Brave's Safe Storage Keychain item (#47). Thanks @retX0!
+
 ## 0.5.10 — 2026-10-23
 
 **Highlights:** Chromium local-storage reads keep HTTP and HTTPS origins distinct, and cookie domain filters now match consistently in SQL and in memory.

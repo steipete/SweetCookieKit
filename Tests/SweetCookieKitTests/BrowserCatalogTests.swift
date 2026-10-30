@@ -9,6 +9,7 @@ struct BrowserCatalogTests {
         ("aside", "Aside", "Aside", ("Aside Safe Storage", "Aside")),
         ("opera", "Opera", "com.operasoftware.Opera", ("Opera Safe Storage", "Opera")),
         ("operaNeon", "Opera Neon", "com.operasoftware.OperaNeon", ("Opera Safe Storage", "Opera")),
+        ("braveOrigin", "Brave Origin", "BraveSoftware/Brave-Origin", ("Brave Safe Storage", "Brave")),
     ])
     func `additional Chromium browsers expose metadata and synthetic profile stores`(
         fixture: (String, String, String, (String, String))) throws
@@ -53,6 +54,7 @@ struct BrowserCatalogTests {
         #expect(order.count == Browser.allCases.count - 1)
         #expect(Set(order) == Set(Browser.allCases.filter { $0 != .claudeDesktop }))
         #expect(Set(order).count == order.count)
+        #expect(order.last == .braveOrigin)
     }
 
     @Test

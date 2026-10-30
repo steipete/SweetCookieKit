@@ -25,6 +25,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case brave
     case braveBeta
     case braveNightly
+    case braveOrigin
     case edge
     case edgeBeta
     case edgeCanary

@@ -43,7 +43,7 @@ print("Loaded \(cookies.count) cookies from \(store.profile.name)")
 
 `Browser.defaultImportOrder` covers every supported Safari, Chromium, and Gecko browser. Pass a narrower list when the user has already chosen a source:
 
-Chromium sources include Aside (`Aside`), Opera (`com.operasoftware.Opera`), and Opera Neon (`com.operasoftware.OperaNeon`) under `~/Library/Application Support`. Aside uses the `Aside Safe Storage` / `Aside` Keychain label; both Opera variants use `Opera Safe Storage` / `Opera`. Discovery reuses the standard `Default` and `Profile N` layout. Hosts can retain Chrome-only policies by passing `[.chrome]`.
+Chromium sources include Aside (`Aside`), Opera (`com.operasoftware.Opera`), and Opera Neon (`com.operasoftware.OperaNeon`) under `~/Library/Application Support`. Aside uses the `Aside Safe Storage` / `Aside` Keychain label; both Opera variants use `Opera Safe Storage` / `Opera`. Brave Origin (`BraveSoftware/Brave-Origin`) is a separate store from Brave but reuses Brave's `Brave Safe Storage` / `Brave` Keychain label. Discovery reuses the standard `Default` and `Profile N` layout. Hosts can retain Chrome-only policies by passing `[.chrome]`.
 
 Ego Lite (`.egoLite`, app bundle `ego lite.app`) uses `~/Library/Application Support/Citro Labs/ego lite` and the `ego safe storage` / `ego` Keychain label. Its profiles use the shared Chromium discovery and cookie decryption path.
 
