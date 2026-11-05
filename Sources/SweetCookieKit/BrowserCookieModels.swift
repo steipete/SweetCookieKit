@@ -11,6 +11,7 @@ public enum Browser: String, Sendable, Hashable, CaseIterable {
     case chrome
     case chromeBeta
     case chromeCanary
+    case chromeDev
     case arc
     case arcBeta
     case arcCanary
