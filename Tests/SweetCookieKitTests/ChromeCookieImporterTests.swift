@@ -188,8 +188,16 @@ struct ChromeCookieImporterTests {
         }
     }
 
-    @Test(arguments: [Browser.egoLite, .braveOrigin])
-    func `additional Chromium clients discover profiles and decrypt cookies`(browser: Browser) throws {
+    @Test(arguments: [
+        ("egoLite", "ego safe storage", "ego"),
+        ("braveOrigin", "Brave Safe Storage", "Brave"),
+        ("chromeDev", "Chrome Safe Storage", "Chrome"),
+    ])
+    func `additional Chromium clients discover profiles and decrypt cookies`(
+        fixture: (String, String, String)) throws
+    {
+        let (browserID, service, account) = fixture
+        let browser = try #require(Browser(rawValue: browserID))
         ChromeCookieImporter.resetSafeStorageKeyCacheForTesting()
         let wasDisabled = BrowserCookieKeychainAccessGate.isDisabled
         BrowserCookieKeychainAccessGate.isDisabled = false
@@ -199,8 +207,6 @@ struct ChromeCookieImporterTests {
         }
 
         let recorder = LabelRecorder()
-        let service = browser == .egoLite ? "ego safe storage" : "Brave Safe Storage"
-        let account = browser == .egoLite ? "ego" : "Brave"
         // Seed the existing cache through the injected lookup; never access the user's Keychain.
         let key = try ChromeCookieImporter.chromeSafeStorageKey(for: browser) { label, user, allowInteraction in
             recorder.record(service: label, account: user, allowInteraction: allowInteraction)

@@ -58,6 +58,8 @@ for store in stores {
 
 Stores identify both the browser profile and the underlying cookie store. This lets an app show the available sources before it reads anything.
 
+Chrome Dev (`.chromeDev`) reads profiles under `Google/Chrome Dev` and uses Chrome's `Chrome Safe Storage` / `Chrome` Keychain label. Its default search position follows Chrome Beta and Canary, after the principal browsers. Explicit browser selections keep their existing raw-value identifiers.
+
 ## Permissions and Keychain access
 
 Safari cookie access may require Full Disk Access. Chromium imports filter cookie hosts before requesting that browser's Safe Storage credential from macOS Keychain. Stores with no matching cookies and cookies with plaintext values need no Keychain access; matching encrypted values may require a prompt.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add Chrome Dev as a Chromium cookie source after Chrome Beta and Canary, reusing Chrome's Safe Storage labels and preserving existing browser selections (thanks @happut). (#42)
+
 ## 0.5.11 — 2026-10-30
 
 **Highlights:** Brave Origin is supported as a Chromium cookie source.
