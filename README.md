@@ -14,7 +14,7 @@ SweetCookieKit requires macOS 13 or newer and Swift 6.2 or newer. Add it to your
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.5.11"),
+    .package(url: "https://github.com/steipete/SweetCookieKit.git", from: "0.6.0"),
 ],
 targets: [
     .target(name: "YourTarget", dependencies: ["SweetCookieKit"]),
