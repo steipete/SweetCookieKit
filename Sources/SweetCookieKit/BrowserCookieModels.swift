@@ -318,6 +318,8 @@ public struct BrowserCookieRecord: Sendable {
     public let expires: Date?
     public let isSecure: Bool
     public let isHTTPOnly: Bool
+    /// The effective SameSite policy, or `nil` when the source does not expose it.
+    public let sameSitePolicy: HTTPCookieStringPolicy?
 
     public init(
         domain: String,
@@ -326,7 +328,8 @@ public struct BrowserCookieRecord: Sendable {
         value: String,
         expires: Date?,
         isSecure: Bool,
-        isHTTPOnly: Bool)
+        isHTTPOnly: Bool,
+        sameSitePolicy: HTTPCookieStringPolicy? = nil)
     {
         self.init(
             domain: domain,
@@ -336,7 +339,8 @@ public struct BrowserCookieRecord: Sendable {
             expires: expires,
             isSecure: isSecure,
             isHTTPOnly: isHTTPOnly,
-            scope: domain.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(".") ? .domain : .hostOnly)
+            scope: domain.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(".") ? .domain : .hostOnly,
+            sameSitePolicy: sameSitePolicy)
     }
 
     public init(
@@ -347,7 +351,8 @@ public struct BrowserCookieRecord: Sendable {
         expires: Date?,
         isSecure: Bool,
         isHTTPOnly: Bool,
-        scope: BrowserCookieScope)
+        scope: BrowserCookieScope,
+        sameSitePolicy: HTTPCookieStringPolicy? = nil)
     {
         self.domain = domain
         self.scope = scope
@@ -357,6 +362,7 @@ public struct BrowserCookieRecord: Sendable {
         self.expires = expires
         self.isSecure = isSecure
         self.isHTTPOnly = isHTTPOnly
+        self.sameSitePolicy = sameSitePolicy
     }
 }
 

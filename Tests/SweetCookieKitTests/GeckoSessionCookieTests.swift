@@ -52,23 +52,25 @@ struct GeckoSessionCookieTests {
         #expect(records[2].path == "/app")
     }
 
-    @Test
-    func `expired SQLite cookie is not resurrected by recovery`() throws {
-        let fixture = try Fixture()
+    @Test(arguments: [false, true])
+    func `expired or unsupported SQLite cookie is not resurrected by recovery`(unsupported: Bool) throws {
+        let fixture = try Fixture(sqliteSameSite: unsupported ? 999 : 0)
         defer { fixture.remove() }
         try fixture.writeRecovery(cookies: [Self.cookie(host: ".example.com", name: "persistent")])
-        let records = try fixture.records(query: .init(referenceDate: Date(timeIntervalSince1970: 4000000001)))
+        let date = Date(timeIntervalSince1970: unsupported ? 200 : 4000000001)
+        let records = try fixture.records(query: .init(referenceDate: date))
         #expect(records.isEmpty)
     }
 
-    @Test
-    func `explicit recovery expiry participates in expiry filtering`() throws {
-        let fixture = try Fixture()
+    @Test(arguments: [15, 16])
+    func `explicit recovery expiry participates in expiry filtering`(schema: Int) throws {
+        let fixture = try Fixture(schema: schema)
+        let expiryMultiplier = schema == 16 ? 1000 : 1
         defer { fixture.remove() }
         var expired = Self.cookie(name: "expired")
-        expired["expiry"] = 100
+        expired["expiry"] = 100 * expiryMultiplier
         var fresh = Self.cookie(name: "fresh")
-        fresh["expiry"] = 300
+        fresh["expiry"] = 300 * expiryMultiplier
         var invalid = Self.cookie(name: "invalid")
         invalid["expiry"] = true
         try fixture.writeRecovery(cookies: [expired, fresh, invalid, Self.cookie(name: "session")])
@@ -76,6 +78,7 @@ struct GeckoSessionCookieTests {
         let now = Date(timeIntervalSince1970: 200)
         let records = try fixture.records(query: .init(referenceDate: now))
         #expect(records.map(\.name) == ["persistent", "fresh", "session"])
+        #expect(records.first?.expires == Date(timeIntervalSince1970: 4000000000))
         let session = try #require(records.first { $0.name == "fresh" })
         #expect(session.expires == nil)
         #expect(try #require(BrowserCookieClient.makeHTTPCookies([session]).first).isSessionOnly)
@@ -181,12 +184,25 @@ struct GeckoSessionCookieTests {
         var handle: OpaquePointer?
         try #require(sqlite3_open(fixture.database.path, &handle) == SQLITE_OK)
         defer { sqlite3_close(handle) }
-        let addColumn = "ALTER TABLE moz_cookies ADD COLUMN originAttributes TEXT NOT NULL DEFAULT ''"
-        let isolate = "UPDATE moz_cookies SET originAttributes='^userContextId=2'"
-        try #require(sqlite3_exec(handle, addColumn, nil, nil, nil) == SQLITE_OK)
-        try #require(sqlite3_exec(handle, isolate, nil, nil, nil) == SQLITE_OK)
-        try fixture.writeRecovery(cookies: [Self.cookie(host: ".example.com", name: "persistent", value: "ordinary")])
-        #expect(try fixture.records().map(\.value) == ["synthetic-db", "ordinary"])
+        let sql = """
+        ALTER TABLE moz_cookies ADD COLUMN originAttributes TEXT NOT NULL DEFAULT '';
+        ALTER TABLE moz_cookies ADD COLUMN isPartitionedAttributeSet INTEGER NOT NULL DEFAULT 0;
+        UPDATE moz_cookies SET originAttributes = '^userContextId=2';
+        INSERT INTO moz_cookies
+            SELECT host, 'partitioned', path, value, expiry, isSecure, isHttpOnly, 0, '', 1 FROM moz_cookies;
+        INSERT INTO moz_cookies
+            SELECT host, 'unspecified', path, value, expiry, isSecure, isHttpOnly, 256, '', 0
+            FROM moz_cookies WHERE name = 'persistent';
+        """
+        try #require(sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK)
+        var ordinary = Self.cookie(host: ".example.com", name: "persistent", value: "ordinary")
+        ordinary["sameSite"] = 2
+        try fixture.writeRecovery(cookies: [ordinary])
+
+        let cookies = BrowserCookieClient.makeHTTPCookies(try fixture.records())
+        #expect(cookies.map(\.name) == ["unspecified", "persistent"])
+        #expect(cookies.map(\.sameSitePolicy) == [.sameSiteLax, .sameSiteStrict])
+        #expect(cookies.last?.value == "ordinary")
     }
 
     @Test
@@ -274,7 +290,7 @@ struct GeckoSessionCookieTests {
         let browser: Browser
         var database: URL { self.directory.appendingPathComponent("cookies.sqlite") }
 
-        init(browser: Browser = .firefox) throws {
+        init(browser: Browser = .firefox, schema: Int = 15, sqliteSameSite: Int = 0) throws {
             self.browser = browser
             self.directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("GeckoSessionTests-\(UUID().uuidString)")
@@ -282,10 +298,13 @@ struct GeckoSessionCookieTests {
             var handle: OpaquePointer?
             try #require(sqlite3_open(self.database.path, &handle) == SQLITE_OK)
             defer { sqlite3_close(handle) }
+            let expiry = schema == 16 ? Int64(4000000000000) : 4000000000
             let sql = """
+            PRAGMA user_version = \(schema);
             CREATE TABLE moz_cookies (host TEXT, name TEXT, path TEXT, value TEXT, expiry INTEGER,
-                                     isSecure INTEGER, isHttpOnly INTEGER);
-            INSERT INTO moz_cookies VALUES ('.example.com', 'persistent', '/', 'synthetic-db', 4000000000, 1, 1);
+                                     isSecure INTEGER, isHttpOnly INTEGER, sameSite INTEGER);
+            INSERT INTO moz_cookies VALUES ('.example.com', 'persistent', '/', 'synthetic-db',
+                                            \(expiry), 1, 1, \(sqliteSameSite));
             """
             try #require(sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK)
         }

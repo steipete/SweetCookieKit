@@ -50,7 +50,8 @@ struct CookieDomainQueryTests {
         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
         INSERT INTO meta VALUES ('version', '23');
         CREATE TABLE cookies (host_key TEXT, name TEXT, path TEXT, expires_utc INTEGER,
-                              is_secure INTEGER, is_httponly INTEGER, encrypted_value BLOB, value TEXT);
+                              is_secure INTEGER, is_httponly INTEGER, encrypted_value BLOB, value TEXT,
+                              top_frame_site_key TEXT, samesite INTEGER);
         CREATE TABLE moz_cookies (host TEXT, name TEXT, path TEXT, value TEXT, expiry INTEGER,
                                  isSecure INTEGER, isHttpOnly INTEGER);
         """
@@ -60,7 +61,7 @@ struct CookieDomainQueryTests {
         for host in hosts {
             let literal = host.replacingOccurrences(of: "'", with: "''")
             let insert = """
-            INSERT INTO cookies VALUES ('\(literal)', '\(literal)', '/', 0, 0, 0, X'', 'synthetic');
+            INSERT INTO cookies VALUES ('\(literal)', '\(literal)', '/', 0, 0, 0, X'', 'synthetic', '', -1);
             INSERT INTO moz_cookies VALUES ('\(literal)', '\(literal)', '/', 'synthetic', 0, 0, 0);
             """
             try #require(sqlite3_exec(database, insert, nil, nil, nil) == SQLITE_OK)

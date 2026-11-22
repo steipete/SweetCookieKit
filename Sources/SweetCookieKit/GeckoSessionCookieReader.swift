@@ -7,7 +7,7 @@ enum GeckoSessionCookieReader {
     private static let maximumSize = 64 * 1024 * 1024
     private static let magic = Data("mozLz40\0".utf8)
 
-    static func readCookies(in profile: URL) -> [GeckoCookieImporter.CookieRecord] {
+    static func readCookies(in profile: URL, expiryDivisor: TimeInterval = 1) -> [GeckoCookieImporter.CookieRecord] {
         let directory = profile.appendingPathComponent("sessionstore-backups")
         // Only fall back when missing; a corrupt current file must not revive older credentials.
         let candidates = [
@@ -28,7 +28,7 @@ enum GeckoSessionCookieReader {
               let root = (try? JSONSerialization.jsonObject(with: json)) as? [String: Any],
               let cookies = root["cookies"] as? [Any]
         else { return [] }
-        return cookies.compactMap(Self.cookieRecord)
+        return cookies.compactMap { Self.cookieRecord($0, expiryDivisor: expiryDivisor) }
     }
 
     private static func decompress(_ data: Data) -> Data? {
@@ -50,7 +50,7 @@ enum GeckoSessionCookieReader {
         return Data(output.prefix(size))
     }
 
-    private static func cookieRecord(_ entry: Any) -> GeckoCookieImporter.CookieRecord? {
+    private static func cookieRecord(_ entry: Any, expiryDivisor: TimeInterval) -> GeckoCookieImporter.CookieRecord? {
         guard let cookie = entry as? [String: Any],
               Self.hasDefaultIsolation(cookie),
               let host = cookie["host"] as? String, !host.isEmpty,
@@ -63,8 +63,14 @@ enum GeckoSessionCookieReader {
             guard let expiry = rawExpiry as? NSNumber,
                   CFGetTypeID(expiry) != CFBooleanGetTypeID(), expiry.doubleValue.isFinite
             else { return nil }
-            expires = Date(timeIntervalSince1970: expiry.doubleValue)
+            expires = Date(timeIntervalSince1970: expiry.doubleValue / expiryDivisor)
         }
+        let rawSameSite = cookie["sameSite"] ?? 0 // Gecko restores legacy entries as SameSite=None.
+        guard let sameSite = rawSameSite as? NSNumber,
+              CFGetTypeID(sameSite) != CFBooleanGetTypeID(),
+              let sameSitePolicy = GeckoCookieImporter.sameSitePolicy(for: sameSite.int64Value),
+              sameSite.doubleValue == Double(sameSite.int64Value)
+        else { return nil }
         return GeckoCookieImporter.CookieRecord(
             host: host,
             name: cookie["name"] as? String ?? "",
@@ -72,7 +78,7 @@ enum GeckoSessionCookieReader {
             value: value,
             expires: nil,
             sessionExpiry: expires,
-            originAttributes: "",
+            sameSitePolicy: sameSitePolicy,
             isSecure: cookie["secure"] as? Bool ?? false,
             isHTTPOnly: cookie["httponly"] as? Bool ?? false)
     }

@@ -64,6 +64,36 @@ struct ChromeCookieImporterTests {
         }
     }
 
+    @Test(arguments: [(-1, "lax"), (0, "none"), (1, "lax"), (2, "strict"), (3, "lax")])
+    func `only unpartitioned cookies keep the effective SameSite policy`(fixture: (Int, String)) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let databaseURL = directory.appendingPathComponent("Cookies")
+        try Self.writeChromiumCookieDatabase(at: databaseURL, value: "synthetic", encryptedValue: Data())
+        var database: OpaquePointer?
+        try #require(sqlite3_open(databaseURL.path, &database) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        let sql = """
+        UPDATE cookies SET samesite = \(fixture.0);
+        INSERT INTO cookies VALUES ('.example.com', 'partitioned', '/', 0, 1, 1, '', X'01', 'https://other.test', 0);
+        INSERT INTO cookies VALUES ('.example.com', 'unknown', '/', 0, 1, 1, '', X'01', '', 99);
+        """
+        try #require(sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK)
+
+        let records = try ChromeCookieImporter.loadCookies(
+            from: Self.cookieStore(at: databaseURL),
+            matchingDomains: ["example.com", "other.test"],
+            domainMatch: .exact,
+            safeStorageKey: { _ in
+                Issue.record("Excluded cookies must not request Safe Storage")
+                return Data()
+            })
+        let cookies = BrowserCookieClient.makeHTTPCookies(records.map(BrowserCookieClient.makeBrowserCookieRecord))
+
+        #expect(cookies.map(\.name) == ["session"])
+        #expect(cookies.first?.sameSitePolicy?.rawValue == fixture.1)
+    }
+
     @Test(arguments: [BrowserCookieDomainMatch.contains, .suffix, .exact])
     func `unrelated hosts do not request safe storage key`(domainMatch: BrowserCookieDomainMatch) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -648,8 +678,9 @@ struct ChromeCookieImporterTests {
         INSERT INTO meta VALUES ('version', '24');
         CREATE TABLE cookies (
             host_key TEXT, name TEXT, path TEXT, expires_utc INTEGER,
-            is_secure INTEGER, is_httponly INTEGER, value TEXT, encrypted_value BLOB);
-        INSERT INTO cookies VALUES ('\(hostKey)', 'session', '/', 0, 1, 1, '\(value)', X'\(encryptedHex)');
+            is_secure INTEGER, is_httponly INTEGER, value TEXT, encrypted_value BLOB,
+            top_frame_site_key TEXT, samesite INTEGER);
+        INSERT INTO cookies VALUES ('\(hostKey)', 'session', '/', 0, 1, 1, '\(value)', X'\(encryptedHex)', '', -1);
         """
         try #require(sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK)
     }

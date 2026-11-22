@@ -28,7 +28,7 @@ enum GeckoCookieImporter {
         let value: String
         let expires: Date?
         let sessionExpiry: Date?
-        let originAttributes: String
+        let sameSitePolicy: HTTPCookieStringPolicy?
         let isSecure: Bool
         let isHTTPOnly: Bool
     }
@@ -79,35 +79,34 @@ enum GeckoCookieImporter {
                 path: "Missing cookie DB for \(store.label)",
                 browser: store.browser)
         }
-        var cookies = try Self.readCookiesFromLockedGeckoDB(
+        var (cookies, expiryDivisor) = try Self.readCookiesFromLockedGeckoDB(
             sourceDB: sourceDB,
             matchingDomains: domains,
             domainMatch: domainMatch,
             browser: store.browser)
         var identities = Set(cookies.map(CookieIdentity.init))
-        let sessions = GeckoSessionCookieReader.readCookies(in: sourceDB.deletingLastPathComponent())
+        let sessions = GeckoSessionCookieReader.readCookies(
+            in: sourceDB.deletingLastPathComponent(), expiryDivisor: expiryDivisor)
         for cookie in sessions where BrowserCookieDomainMatcher.matches(
             domain: cookie.host, patterns: domains, match: domainMatch)
         {
-            // SQLite wins, even for expired rows, so an old recovery value cannot resurrect it.
+            // An expired or unsupported SQLite row must still suppress stale recovery values.
             if identities.insert(CookieIdentity(cookie)).inserted {
                 cookies.append(cookie)
             }
         }
-        return cookies
+        return cookies.filter { $0.sameSitePolicy != nil }
     }
 
     private struct CookieIdentity: Hashable {
         let host: String
         let name: String
         let path: String
-        let originAttributes: String
 
         init(_ cookie: CookieRecord) {
             self.host = cookie.host
             self.name = cookie.name
             self.path = cookie.path
-            self.originAttributes = cookie.originAttributes
         }
     }
 
@@ -117,7 +116,7 @@ enum GeckoCookieImporter {
         sourceDB: URL,
         matchingDomains: [String],
         domainMatch: BrowserCookieDomainMatch,
-        browser: Browser) throws -> [CookieRecord]
+        browser: Browser) throws -> (cookies: [CookieRecord], expiryDivisor: TimeInterval)
     {
         guard FileManager.default.isReadableFile(atPath: sourceDB.path) else {
             throw ImportError.cookieDBNotReadable(path: sourceDB.path, browser: browser)
@@ -153,7 +152,7 @@ enum GeckoCookieImporter {
         fromDB path: String,
         matchingDomains: [String],
         domainMatch: BrowserCookieDomainMatch,
-        browser: Browser) throws -> [CookieRecord]
+        browser: Browser) throws -> (cookies: [CookieRecord], expiryDivisor: TimeInterval)
     {
         var db: OpaquePointer?
         // Only the disposable copy is writable, so SQLite can recreate missing WAL sidecars.
@@ -162,17 +161,30 @@ enum GeckoCookieImporter {
         }
         defer { sqlite3_close(db) }
 
+        var version: OpaquePointer?
+        defer { sqlite3_finalize(version) }
+        guard sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &version, nil) == SQLITE_OK,
+              sqlite3_step(version) == SQLITE_ROW
+        else {
+            throw ImportError.sqliteFailed(message: String(cString: sqlite3_errmsg(db)), browser: browser)
+        }
+        // Gecko schema 16 migrated expiry from seconds to milliseconds.
+        let expiryDivisor: TimeInterval = sqlite3_column_int(version, 0) >= 16 ? 1000 : 1
+
         let conditions = BrowserCookieDomainMatcher.sqlCondition(
             column: "host",
             patterns: matchingDomains,
             match: domainMatch)
-        let hasOriginAttributes = sqlite3_table_column_metadata(
-            db, nil, "moz_cookies", "originAttributes", nil, nil, nil, nil, nil) == SQLITE_OK
-        let originAttributesColumn = hasOriginAttributes ? "originAttributes" : "''"
+        func columnExists(_ column: String) -> Bool {
+            sqlite3_table_column_metadata(db, nil, "moz_cookies", column, nil, nil, nil, nil, nil) == SQLITE_OK
+        }
+        let originFilter = columnExists("originAttributes") ? "AND originAttributes = ''" : ""
+        let partitionFilter = columnExists("isPartitionedAttributeSet") ? "AND isPartitionedAttributeSet = 0" : ""
+        let sameSiteColumn = columnExists("sameSite") ? "sameSite" : "0"
         let sql = """
-        SELECT host, name, path, value, expiry, isSecure, isHttpOnly, \(originAttributesColumn)
+        SELECT host, name, path, value, expiry, isSecure, isHttpOnly, \(sameSiteColumn)
         FROM moz_cookies
-        WHERE \(conditions)
+        WHERE (\(conditions)) \(originFilter) \(partitionFilter)
         """
 
         var stmt: OpaquePointer?
@@ -189,11 +201,13 @@ enum GeckoCookieImporter {
                   let value = Self.readTextColumn(stmt, index: 3)
             else { continue }
 
+            let sameSitePolicy = sqlite3_column_type(stmt, 7) == SQLITE_INTEGER
+                ? Self.sameSitePolicy(for: sqlite3_column_int64(stmt, 7)) : nil
             let expiry = sqlite3_column_int64(stmt, 4)
             let isSecure = sqlite3_column_int(stmt, 5) != 0
             let isHTTPOnly = sqlite3_column_int(stmt, 6) != 0
 
-            let expiresDate = expiry > 0 ? Date(timeIntervalSince1970: TimeInterval(expiry)) : nil
+            let expiresDate = expiry > 0 ? Date(timeIntervalSince1970: TimeInterval(expiry) / expiryDivisor) : nil
 
             out.append(CookieRecord(
                 host: host,
@@ -202,12 +216,21 @@ enum GeckoCookieImporter {
                 value: value,
                 expires: expiresDate,
                 sessionExpiry: nil,
-                originAttributes: Self.readTextColumn(stmt, index: 7) ?? "",
+                sameSitePolicy: sameSitePolicy,
                 isSecure: isSecure,
                 isHTTPOnly: isHTTPOnly))
         }
 
-        return out
+        return (out, expiryDivisor)
+    }
+
+    static func sameSitePolicy(for value: Int64) -> HTTPCookieStringPolicy? {
+        switch value {
+        case 0: HTTPCookieStringPolicy(rawValue: "None")
+        case 1, 256: .sameSiteLax // Gecko's SAMESITE_UNSET uses Lax by default.
+        case 2: .sameSiteStrict
+        default: nil
+        }
     }
 
     private static func readTextColumn(_ stmt: OpaquePointer?, index: Int32) -> String? {

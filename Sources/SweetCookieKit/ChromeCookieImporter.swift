@@ -38,6 +38,7 @@ enum ChromeCookieImporter {
         let expiresUTC: Int64
         let isSecure: Bool
         let isHTTPOnly: Bool
+        let sameSitePolicy: HTTPCookieStringPolicy
         let value: String
     }
 
@@ -136,10 +137,15 @@ enum ChromeCookieImporter {
             column: "host_key",
             patterns: matchingDomains,
             match: domainMatch)
+        // Chromium added the partition key in schema 15. Never request a key for an isolated row.
+        let partitionFilter = databaseVersion >= 15 ? "AND top_frame_site_key = ''" : ""
+        let hasSameSite = sqlite3_table_column_metadata(
+            db, nil, "cookies", "samesite", nil, nil, nil, nil, nil) == SQLITE_OK
+        let sameSiteColumn = databaseVersion >= 15 || hasSameSite ? "samesite" : "-1"
         let sql = """
-        SELECT host_key, name, path, expires_utc, is_secure, is_httponly, value, encrypted_value
+        SELECT host_key, name, path, expires_utc, is_secure, is_httponly, value, encrypted_value, \(sameSiteColumn)
         FROM cookies
-        WHERE \(conditions)
+        WHERE (\(conditions)) \(partitionFilter) AND \(sameSiteColumn) IN (-1, 0, 1, 2, 3)
         """
 
         var stmt: OpaquePointer?
@@ -157,6 +163,13 @@ enum ChromeCookieImporter {
             let expires = sqlite3_column_int64(stmt, 3)
             let isSecure = sqlite3_column_int(stmt, 4) != 0
             let isHTTPOnly = sqlite3_column_int(stmt, 5) != 0
+
+            let sameSitePolicy: HTTPCookieStringPolicy = switch sqlite3_column_int(stmt, 8) {
+            case 0: HTTPCookieStringPolicy(rawValue: "None")
+            case 2: .sameSiteStrict
+            // Chromium treats an unspecified cookie (including the deprecated Extended value) as Lax.
+            default: .sameSiteLax
+            }
 
             let plain = Self.readTextColumn(stmt, index: 6)
             let enc = Self.readBlobColumn(stmt, index: 7)
@@ -186,6 +199,7 @@ enum ChromeCookieImporter {
                 expiresUTC: expires,
                 isSecure: isSecure,
                 isHTTPOnly: isHTTPOnly,
+                sameSitePolicy: sameSitePolicy,
                 value: value))
         }
         return out

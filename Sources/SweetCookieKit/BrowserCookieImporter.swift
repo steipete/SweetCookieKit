@@ -157,7 +157,8 @@ public struct BrowserCookieClient: Sendable {
                         expires: record.expires,
                         isSecure: record.isSecure,
                         isHTTPOnly: record.isHTTPOnly,
-                        scope: BrowserCookieDomainMatcher.scope(forStoredDomain: record.host))
+                        scope: BrowserCookieDomainMatcher.scope(forStoredDomain: record.host),
+                        sameSitePolicy: record.sameSitePolicy)
                 }
             } catch let error as GeckoCookieImporter.ImportError {
                 throw BrowserCookieError.mapGeckoError(error, browser: store.browser)
@@ -183,7 +184,8 @@ public struct BrowserCookieClient: Sendable {
             expires: BrowserCookieDomainMatcher.chromeExpiryDate(expiresUTC: record.expiresUTC),
             isSecure: record.isSecure,
             isHTTPOnly: record.isHTTPOnly,
-            scope: BrowserCookieDomainMatcher.scope(forStoredDomain: record.hostKey))
+            scope: BrowserCookieDomainMatcher.scope(forStoredDomain: record.hostKey),
+            sameSitePolicy: record.sameSitePolicy)
     }
 
     /// Loads `HTTPCookie` values from a specific cookie store.
@@ -242,7 +244,7 @@ public struct BrowserCookieClient: Sendable {
             let domain = BrowserCookieDomainMatcher.normalizeDomain(record.domain)
             guard !domain.isEmpty else { return nil }
             var props: [HTTPCookiePropertyKey: Any] = [
-                .domain: domain,
+                .domain: record.scope == .domain ? ".\(domain)" : domain,
                 .path: record.path,
                 .name: record.name,
                 .value: record.value,
@@ -253,6 +255,9 @@ public struct BrowserCookieClient: Sendable {
             }
             if record.isHTTPOnly {
                 props[.init("HttpOnly")] = "TRUE"
+            }
+            if let sameSitePolicy = record.sameSitePolicy {
+                props[.sameSitePolicy] = sameSitePolicy.rawValue
             }
             if let expires = record.expires {
                 props[.expires] = expires
