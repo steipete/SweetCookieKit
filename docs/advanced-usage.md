@@ -32,7 +32,9 @@ let cookies = try client.cookies(matching: query, in: store)
 
 `records(matching:in:)` returns normalized `BrowserCookieRecord` values. `cookies(matching:in:)` converts matching records to `HTTPCookie` values using the query's origin strategy.
 
-For Safari, Chromium, and Gecko stores, each record's `scope` retains whether the stored cookie was host-only or a domain cookie. For example, stored `.example.com` and `example.com` cookies both have the normalized `domain` value `example.com`, with `.domain` and `.hostOnly` scope respectively.
+For Safari, Chromium, and Gecko stores, each record's `scope` retains whether the stored cookie was host-only or a domain cookie. For example, stored `.example.com` and `example.com` cookies both have the normalized `domain` value `example.com`, with `.domain` and `.hostOnly` scope respectively. Conversion to `HTTPCookie` retains this distinction and any source SameSite policy. Chromium and Gecko cookies with an unspecified policy are converted as Lax. The Safari binary reader does not expose SameSite, so its records leave `sameSitePolicy` unset.
+
+Chromium rows with a partition key and Gecko rows with a partition marker or non-default origin attributes are excluded because the public record cannot represent their isolation.
 
 ## Search multiple browsers
 
@@ -53,9 +55,9 @@ Chromium and Gecko cookie imports read temporary copies of the database and any 
 
 Firefox and other Gecko imports also read session cookies from the selected profile's `sessionstore-backups/recovery.jsonlz4`. When that file is missing, imports use the profile's `sessionstore.jsonlz4` from a clean shutdown, then `sessionstore-backups/recovery.baklz4` if neither current snapshot exists. A corrupt or unreadable selected snapshot does not fall back to an older one. Missing, malformed, or oversized snapshots do not prevent database imports; compressed files and decoded JSON are each limited to 64 MiB. Snapshots reflect the browser's last saved session, so very recent login or logout changes may not yet be present.
 
-These imported cookies remain session-only, including when a saved entry has an explicit expiry limit. That limit is honored by the query's expiry filter without making the resulting `HTTPCookie` persistent. The same domain filters apply to both sources. SQLite wins when both sources contain the same host, name, path, and origin attributes; an isolated SQLite cookie cannot suppress an ordinary session cookie.
+These imported cookies remain session-only, including when a saved entry has an explicit expiry limit. That limit is honored by the query's expiry filter without making the resulting `HTTPCookie` persistent. The same domain filters apply to both sources. SQLite wins when both sources contain the same host, name, and path after isolated cookies have been filtered out.
 
-Recovery cookies with container, private-browsing, first-party, GeckoView-session, or partition identity are excluded because `BrowserCookieRecord` cannot represent that isolation. Unknown or malformed origin attributes are excluded too; absent attributes and known default values are accepted. This restriction applies to the recovery reader.
+Recovery cookies with container, private-browsing, first-party, GeckoView-session, or partition identity are excluded because `BrowserCookieRecord` cannot represent that isolation. Unknown or malformed origin attributes are excluded too; absent attributes and known default values are accepted. The recovery reader applies these checks before merging with the SQLite results.
 
 ## Explain Keychain prompts
 

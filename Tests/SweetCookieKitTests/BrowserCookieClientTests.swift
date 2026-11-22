@@ -6,21 +6,23 @@ import Testing
 #if os(macOS)
 
 struct BrowserCookieClientTests {
-    @Test
-    func `make HTTP cookies sets expected fields`() {
+    @Test(arguments: ["example.com", ".example.com"])
+    func `make HTTP cookies preserves scope and policy`(storedDomain: String) {
         let record = BrowserCookieRecord(
-            domain: ".example.com",
+            domain: storedDomain,
             name: "session",
             path: "/",
             value: "abc",
             expires: Date(timeIntervalSince1970: 1_700_000_000),
             isSecure: true,
-            isHTTPOnly: true)
+            isHTTPOnly: true,
+            sameSitePolicy: .sameSiteStrict)
 
         let cookies = BrowserCookieClient.makeHTTPCookies([record])
         #expect(cookies.count == 1)
         guard let cookie = cookies.first else { return }
-        #expect(cookie.domain == "example.com")
+        #expect(cookie.domain == storedDomain)
+        #expect(cookie.sameSitePolicy == .sameSiteStrict)
         #expect(cookie.name == "session")
         #expect(cookie.path == "/")
         #expect(cookie.value == "abc")
@@ -45,6 +47,7 @@ struct BrowserCookieClientTests {
                 expiresUTC: 0,
                 isSecure: true,
                 isHTTPOnly: true,
+                sameSitePolicy: .sameSiteLax,
                 value: "synthetic")
             let record = BrowserCookieClient.makeBrowserCookieRecord(chromiumRecord)
 
